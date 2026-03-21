@@ -41700,23 +41700,41 @@ if (typeof module !== 'undefined' && module.exports) {
 
         function saveComputers() {
             if (urlvars['host']) return;
-
-
-
             try { localStorage.setItem('computers', JSON.stringify(computerlist)); } catch (ex) { }
-
+            // Save to server for persistence across sessions
+            try {
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/webrelay.ashx?action=savecomputerlist', true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.send(JSON.stringify(computerlist));
+            } catch (ex) { }
         }
 
         function loadComputers() {
             if (urlvars['host']) return;
-
-
-            var ctext = null;
-            try { ctext = localStorage.getItem('computers'); } catch (ex) { }
-            if (ctext) { try { computerlist = JSON.parse(ctext); } catch (e) { computerlist = []; } }
-
-            updateComputerList();
-
+            // Load from server first, fallback to localStorage
+            try {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', '/webrelay.ashx?action=getcomputerlist', true);
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200 && xhr.responseText) {
+                            try { computerlist = JSON.parse(xhr.responseText); } catch (e) { computerlist = []; }
+                        } else {
+                            var ctext = null;
+                            try { ctext = localStorage.getItem('computers'); } catch (ex) { }
+                            if (ctext) { try { computerlist = JSON.parse(ctext); } catch (e) { computerlist = []; } }
+                        }
+                        updateComputerList();
+                    }
+                };
+                xhr.send();
+            } catch (ex) {
+                var ctext = null;
+                try { ctext = localStorage.getItem('computers'); } catch (ex2) { }
+                if (ctext) { try { computerlist = JSON.parse(ctext); } catch (e) { computerlist = []; } }
+                updateComputerList();
+            }
         }
 
 

@@ -30,6 +30,9 @@ module.exports.CreateWebServer = function (args) {
         return null;
     }
     
+    // Parse JSON request bodies
+    obj.app.use(obj.express.json());
+
     // Indicates to ExpressJS that the public folder should be used to serve static files. Mesh Commander will be at "default.htm".
     obj.app.use(obj.express.static(obj.path.join(__dirname, 'public')));
     
@@ -39,21 +42,40 @@ module.exports.CreateWebServer = function (args) {
         res.redirect('/default.htm');
     });
     
-    // For the server version of Mesh Commander, we send the computer list without credential and insertion credentials in the stream.
+    // Computer list config file path
+    obj.configPath = obj.path.join(__dirname, 'computerlist.config');
+
+    // Get computer list
     obj.app.get('/webrelay.ashx', function (req, res) {
         res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' });
         if (req.query.action == 'getcomputerlist') {
-            obj.fs.readFile('computerlist.config', 'utf8', function (err, data) {
-                if (err == null) {
-                    var list = JSON.parse(data);
-                    obj.computerlist = obj.common.Clone(list);
-                    for (var i in list) { delete list[i].pass; } // Remove all passwords.
-                    res.set({ 'Content-Type': 'application/json' });
-                    res.send(JSON.stringify(list));
-                }
+            obj.fs.readFile(obj.configPath, 'utf8', function (err, data) {
+                var list = [];
+                if (err == null) { try { list = JSON.parse(data); } catch (e) { list = []; } }
+                obj.computerlist = obj.common.Clone(list);
+                for (var i in list) { delete list[i].pass; }
+                res.set({ 'Content-Type': 'application/json' });
+                res.send(JSON.stringify(list));
             });
+            return;
         }
-        try { res.close(); } catch (e) { }
+        try { res.end(); } catch (e) { }
+    });
+
+    // Save computer list
+    obj.app.post('/webrelay.ashx', function (req, res) {
+        res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' });
+        if (req.query.action == 'savecomputerlist') {
+            var list = req.body;
+            if (!Array.isArray(list)) { res.status(400).send('Invalid data'); return; }
+            obj.computerlist = obj.common.Clone(list);
+            obj.fs.writeFile(obj.configPath, JSON.stringify(list, null, 2), 'utf8', function (err) {
+                if (err) { res.status(500).send('Failed to save'); return; }
+                res.send('OK');
+            });
+            return;
+        }
+        try { res.end(); } catch (e) { }
     });
     
     // Indicates to ExpressJS what we want to handle websocket requests on "/webrelay.ashx". This is the same URL as IIS making things simple, we can use the same web application for both IIS and Node.
