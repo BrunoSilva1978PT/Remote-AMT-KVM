@@ -21,6 +21,76 @@ html.dark-mode {
     --item-bar: #3a3a3a; --item-hover: #4a4a4a; --log-bg: #333; --timer: #2a4a6a;
     --shadow: rgba(0,0,0,0.4); --input-border: #555; --input-bg: #2a2a2a; --success: #5b8; --monitor-active: #5aadff;
 }
+/* Dark mode overrides for inline styles */
+html.dark-mode div, html.dark-mode td, html.dark-mode th, html.dark-mode tr, html.dark-mode table,
+html.dark-mode span, html.dark-mode p, html.dark-mode input, html.dark-mode select, html.dark-mode textarea {
+    color: inherit;
+}
+html.dark-mode input[type=text], html.dark-mode input[type=password], html.dark-mode select, html.dark-mode textarea {
+    background-color: var(--input-bg) !important; color: var(--text) !important; border-color: var(--input-border) !important;
+}
+html.dark-mode input[type=button], html.dark-mode input[type=submit] {
+    background-color: var(--bg-alt) !important; color: var(--text) !important; border-color: var(--border) !important;
+}
+html.dark-mode input[type=button]:hover, html.dark-mode input[type=submit]:hover {
+    background-color: var(--hover) !important;
+}
+html.dark-mode div[style*="background-color:#CCC"], html.dark-mode div[style*="background-color:#ccc"],
+html.dark-mode div[style*="background:#CCC"], html.dark-mode div[style*="background:#ccc"],
+html.dark-mode div[style*="background-color: #CCC"] {
+    background-color: var(--bg-alt) !important;
+}
+html.dark-mode div[style*="background-color:#EEE"], html.dark-mode div[style*="background-color:#eee"],
+html.dark-mode div[style*="background-color: #EEE"],
+html.dark-mode div[style*="background-color:#EEEEEE"], html.dark-mode div[style*="background-color:#eeeeee"] {
+    background-color: var(--bg-alt) !important;
+}
+html.dark-mode div[style*="background-color:white"], html.dark-mode div[style*="background:white"],
+html.dark-mode td[style*="background-color:white"], html.dark-mode td[style*="background:white"],
+html.dark-mode table[style*="background-color:white"], html.dark-mode table[style*="background:white"] {
+    background-color: var(--bg) !important;
+}
+html.dark-mode div[style*="color:gray"], html.dark-mode span[style*="color:gray"],
+html.dark-mode td[style*="color:gray"], html.dark-mode p[style*="color:gray"] {
+    color: var(--text-secondary) !important;
+}
+html.dark-mode div[style*="color:black"], html.dark-mode span[style*="color:black"],
+html.dark-mode td[style*="color:black"], html.dark-mode p[style*="color:black"] {
+    color: var(--text) !important;
+}
+html.dark-mode div[style*="border:1px solid gray"], html.dark-mode div[style*="border: 1px solid gray"] {
+    border-color: var(--border) !important;
+}
+html.dark-mode div[style*="background-color:#e8eefe"], html.dark-mode div[style*="background:#e8eefe"],
+html.dark-mode tr[style*="background-color:#e8eefe"] {
+    background-color: var(--table-alt) !important;
+}
+html.dark-mode div[style*="box-shadow"], html.dark-mode div[style*="boxShadow"] {
+    box-shadow: 0px 0px 15px rgba(0,0,0,0.5) !important;
+}
+html.dark-mode .maincell, html.dark-mode .fullcell { background-color: var(--bg); }
+html.dark-mode .navbar { background: var(--bg-alt) !important; border-right-color: var(--border) !important; }
+html.dark-mode .computeritem:hover { background-color: var(--hover) !important; }
+html.dark-mode h1, html.dark-mode h2 { color: var(--text) !important; }
+html.dark-mode a:visited, html.dark-mode a:link { color: var(--accent); }
+html.dark-mode .log, html.dark-mode .log1 { background: var(--log-bg) !important; }
+html.dark-mode .log tbody tr:nth-child(odd) { background: var(--table-alt) !important; }
+html.dark-mode .spread { background-color: var(--bg) !important; }
+html.dark-mode .r0 { background: var(--bg) !important; }
+html.dark-mode .r3:hover { background-color: var(--hover) !important; }
+html.dark-mode .itemBar { background-color: var(--item-bar) !important; }
+html.dark-mode .timer { border-color: var(--border) !important; background-color: var(--timer) !important; }
+html.dark-mode #id_computerSelector table[style*="background-color:#808080"] { background-color: #333 !important; }
+html.dark-mode #id_computerDetailsParent, html.dark-mode #id_computerDetails { background-color: var(--bg-alt) !important; color: var(--text) !important; }
+html.dark-mode #id_computerListParent { background-color: var(--bg) !important; }
+html.dark-mode #id_StartupScreen { color: var(--text-secondary) !important; }
+html.dark-mode #id_noKnownComputers { color: var(--text-secondary) !important; }
+html.dark-mode div[style*="background-color:#808080"], html.dark-mode table[style*="background-color:#808080"],
+html.dark-mode div[style*="background:#808080"], html.dark-mode table[style*="background:#808080"] { background-color: #333 !important; }
+html.dark-mode div[style*="background-color:#8fac8d"], html.dark-mode div[style*="background:#8fac8d"] { background-color: #2a4a3a !important; }
+html.dark-mode div[style*="background-color:#99CC99"], html.dark-mode div[style*="background:#99CC99"] { background-color: #2a4a3a !important; }
+html.dark-mode div[style*="background-color:#003366"], html.dark-mode div[style*="background:#003366"] { background-color: var(--dialog-header) !important; }
+html.dark-mode option { background-color: var(--input-bg); color: var(--text); }
 body {
     height: 100%;
     max-height: 100%;
