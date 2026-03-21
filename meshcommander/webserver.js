@@ -30,9 +30,6 @@ module.exports.CreateWebServer = function (args) {
         return null;
     }
     
-    // Parse JSON request bodies
-    obj.app.use(obj.express.json());
-
     // Indicates to ExpressJS that the public folder should be used to serve static files. Mesh Commander will be at "default.htm".
     obj.app.use(obj.express.static(obj.path.join(__dirname, 'public')));
     
@@ -63,7 +60,7 @@ module.exports.CreateWebServer = function (args) {
     });
 
     // Save computer list
-    obj.app.post('/webrelay.ashx', function (req, res) {
+    obj.app.post('/webrelay.ashx', obj.express.json(), function (req, res) {
         res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' });
         if (req.query.action == 'savecomputerlist') {
             var list = req.body;
