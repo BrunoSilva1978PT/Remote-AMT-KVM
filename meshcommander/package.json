@@ -1,0 +1,47 @@
+{
+  "version": "0.9.5-a",
+  "author": {
+    "email": "ysainthilaire@hotmail.com",
+    "name": "Ylian Saint-Hilaire"
+  },
+  "bin": {
+    "meshcommander": "./bin/meshcommander"
+  },
+  "dependencies": {
+    "express": "^4.13.4",
+    "express-ws": "^2.0.0",
+    "minimist": "^1.2.0"
+  },
+  "description": "MeshCommander web server",
+  "files": [
+    "*.js",
+    "license.txt",
+    "readme.txt",
+    "public",
+    "bin"
+  ],
+  "homepage": "http://meshcommander.com",
+  "keywords": [
+    "Intel Active Management Technology",
+    "Remote Management",
+    "Intel AMT",
+    "Active Management",
+    "Remote Desktop"
+  ],
+  "license": "Apache-2.0",
+  "main": "meshcommander.js",
+  "maintainers": [
+    {
+      "email": "ysainthilaire@hotmail.com",
+      "name": "ysainthilaire"
+    }
+  ],
+  "name": "meshcommander",
+  "optionalDependencies": {},
+  "readme": "readme.txt",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ylianst/MeshCommander.git"
+  },
+  "scripts": {}
+}

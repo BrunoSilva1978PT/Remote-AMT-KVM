@@ -1,0 +1,40 @@
+{
+  "name": "meshcommander",
+  "version": "0.9.6",
+  "description": "Intel(R) Active Management Technology console tool",
+  "main": "main.js",
+  "author": "Intel Corporation",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.meshcommander.app",
+    "productName": "MeshCommander",
+    "win": {
+      "target": "nsis",
+      "icon": "favicon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "main.js",
+      "meshcommander/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": []
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-ws": "^5.0.2",
+    "minimist": "^1.2.8"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}
