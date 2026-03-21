@@ -5,14 +5,30 @@
     <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
     <meta name="format-detection" content="telephone=no">
     <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo="> <!-- Stop favicon.ico from loading -->
-        <style>body {
+        <style>:root {
+    --bg: #ffffff; --bg-alt: #f5f5f5; --text: #1a1a1a; --text-secondary: #555;
+    --primary: #1a3a5c; --primary-light: #2a5a8c; --primary-gradient-start: #d0e0f0; --primary-gradient-end: #e8f0fa;
+    --border: #c0d0e0; --hover: #e0e8f0; --dialog-bg: #f0f0f0; --dialog-header: #1a3a5c;
+    --header-text: #d0d0d0; --warning: #c00000; --accent: #3a8fd6; --table-alt: #f0f5ff;
+    --item-bar: #6a7a8a; --item-hover: #5a6a7a; --log-bg: #c0c8d0; --timer: #a0c0e0;
+    --shadow: rgba(0,0,0,0.15); --input-border: #c0c8d0; --input-bg: #fff; --success: #4a8; --monitor-active: #3a8fd6;
+}
+html.dark-mode {
+    --bg: #1e1e1e; --bg-alt: #2a2a2a; --text: #e0e0e0; --text-secondary: #aaa;
+    --primary: #1a2a3a; --primary-light: #2a4a6a; --primary-gradient-start: #2a2a2a; --primary-gradient-end: #1e1e1e;
+    --border: #444; --hover: #333; --dialog-bg: #2d2d2d; --dialog-header: #1a2a3a;
+    --header-text: #ccc; --warning: #ff6b6b; --accent: #5aadff; --table-alt: #252525;
+    --item-bar: #3a3a3a; --item-hover: #4a4a4a; --log-bg: #333; --timer: #2a4a6a;
+    --shadow: rgba(0,0,0,0.4); --input-border: #555; --input-bg: #2a2a2a; --success: #5b8; --monitor-active: #5aadff;
+}
+body {
     height: 100%;
     max-height: 100%;
     overflow: hidden;
-    font-family: arial, helvetica, sans-serif;
-    font-size: 9pt;
-    color: black;
-    background: white;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 10pt;
+    color: var(--text);
+    background: var(--bg);
     margin-top: 0;
     margin-left: 0;
     margin-right: 0;
@@ -31,22 +47,22 @@ li {
 
 a:visited {
     text-decoration: none;
-    color: #04f;
+    color: var(--accent);
 }
 
 a:link {
     text-decoration: none;
-    color: #04f;
+    color: var(--accent);
 }
 
 a:hover {
-    color: #555;
+    color: var(--text-secondary);
 }
 
 h1 {
     font-size: 11pt;
     font-weight: bold;
-    color: black;
+    color: var(--text);
     margin-left: 5px;
     margin-top: 10px;
     margin-bottom: 6px;
@@ -55,7 +71,7 @@ h1 {
 h2 {
     font-size: 9pt;
     font-weight: bold;
-    color: black;
+    color: var(--text);
     margin-left: 6px;
     margin-top: 6px;
     margin-bottom: 0;
@@ -69,16 +85,16 @@ p {
 }
 
 td {
-    font-size: 9pt;
+    font-size: 10pt;
 }
 
 th {
-    font-size: 9pt;
+    font-size: 10pt;
 }
 
     th:hover {
         cursor: pointer;
-        background: #aaa;
+        background: var(--hover);
     }
 
 .header {
@@ -87,8 +103,7 @@ th {
     left: 0;
     right: 0;
     height: 67px;
-    background: #036;
-    /* background: linear-gradient(135deg, #6a6960 0%,#42413c 100%); */
+    background: var(--primary);
 }
 
 .progressbar {
@@ -97,7 +112,7 @@ th {
     left: 0;
     right: 0;
     height: 2px;
-    background: #036;
+    background: var(--primary);
 }
 
 .in {
@@ -105,15 +120,15 @@ th {
 }
 
 .log {
-    background: #bbbab5;
+    background: var(--log-bg);
 }
 
 .log1 {
-    background: #bbbab5;
+    background: var(--log-bg);
 }
 
 .log tbody tr:nth-child(odd) {
-    background: #e8eefe;
+    background: var(--table-alt);
 }
 
 .fullcell {
@@ -142,17 +157,17 @@ th {
     left: 0;
     bottom: 0;
     width: 156px;
-    border-right: 2px solid #B0C6FC;
+    border-right: 2px solid var(--border);
     vertical-align: top;
-    background: #036;
-    background: linear-gradient(to bottom, #bfd1fc 0%,#e8eefe 100%);
+    background: var(--primary);
+    background: linear-gradient(to bottom, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
 }
 
 .nav1 {
     padding: 1px 0px 1px 8px;
     margin: 0px;
     font-weight: bold;
-    color: black;
+    color: var(--text);
     white-space: nowrap;
     cursor: pointer;
 }
@@ -160,7 +175,7 @@ th {
 .nav2 {
     margin-left: 32px;
     margin-top: 0;
-    color: black;
+    color: var(--text);
     cursor: pointer;
 }
 
@@ -169,11 +184,11 @@ th {
 }
 
 .r0 {
-    background: white;
+    background: var(--bg);
 }
 
 .r1 {
-    border-bottom: 1px solid gray;
+    border-bottom: 1px solid var(--border);
     text-align: left;
 }
 
@@ -182,24 +197,24 @@ th {
 }
 
 .r3 {
-    border-bottom: 1px solid gray;
+    border-bottom: 1px solid var(--border);
     text-align: left;
 }
 
     .r3:hover {
-        background-color: #83827b;
+        background-color: var(--hover);
         cursor: pointer;
     }
 
 .spread {
     height: 100%;
     width: 100%;
-    background-color: white;
+    background-color: var(--bg);
 }
 
 .timer {
-    border: 1px solid #abcae1;
-    background-color: #abcae1;
+    border: 1px solid var(--timer);
+    background-color: var(--timer);
 }
 
 .tm {
@@ -209,19 +224,19 @@ th {
 .top1 {
     font-size: 20pt;
     font-weight: bold;
-    color: #C8C8C8;
+    color: var(--header-text);
     margin-top: 6px;
     margin-left: 10px;
 }
 
 .top2 {
-    color: #C8C8C8;
+    color: var(--header-text);
     margin-left: 10px;
 }
 
 .warn {
     font-weight: bold;
-    color: #c00000;
+    color: var(--warning);
 }
 
 .icon1 {
@@ -252,7 +267,7 @@ th {
     margin-right: 8px;
     width: auto;
     border-radius: 8px;
-    background-color: #8c8b81;
+    background-color: var(--item-bar);
     cursor: pointer;
 }
 
@@ -260,7 +275,7 @@ th {
     width: 12px;
     height: 12px;
     border-radius: 4px;
-    background: gray;
+    background: var(--text-secondary);
     margin-right:4px;
 }
 
@@ -277,7 +292,7 @@ th {
 }
 
     .computeritem:hover {
-        background-color: #83827b;
+        background-color: var(--item-hover);
     }
 
 .us {
@@ -456,11 +471,20 @@ th {
 }
 
 
+input[type=button], button, .connectbutton { transition: background-color 0.15s, box-shadow 0.15s; border-radius: 4px; }
+input[type=button]:hover, button:hover { box-shadow: 0 2px 4px var(--shadow); }
+input[type=text], input[type=password], select { border: 1px solid var(--input-border); border-radius: 4px; padding: 4px 8px; background: var(--input-bg); color: var(--text); }
+input[type=text]:focus, input[type=password]:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(58,143,214,0.2); }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-alt); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
 .lbbutton {
     width:44px;
     height:44px;
     border-radius:5px;
-    background-color:white;
+    background-color:var(--bg);
     margin-left:4px;
     margin-top:4px;
     position:relative;
@@ -513,12 +537,13 @@ th {
     cursor: pointer;
     border: none;
 }</style>
-            
-    
-    
-    
-            
-    
+    <script>try { if (localStorage.getItem('darkMode') === '1') { document.documentElement.classList.add('dark-mode'); } } catch(e) {}</script>
+
+
+
+
+
+
     
     
     
@@ -537,7 +562,7 @@ th {
     
     <style>
         .menuitem { cursor: pointer; border: none; padding:5px; }
-        .menuitem:hover { background-color: #6b9dc7; }
+        .menuitem:hover { background-color: var(--accent); }
     </style>
     <style>
         .contextMenu {
@@ -667,7 +692,8 @@ th {
                                                         <table class="topCell" style="width:100%;height:55px">
             <tr>
                 <td valign="top" nowrap="nowrap">
-                                                                                
+
+                                        <div id="darkModeBtn" style="position:absolute;top:8px;right:10px;cursor:pointer;font-size:18px;color:var(--header-text)" onclick="toggleDarkMode()" title="Toggle Dark Mode">&#9790;</div>
                                         <p class="top1">MeshCommander</p>
                                                                                                                                                                                                         <p class="top2" id="id_computername">
                 </td>
@@ -715,7 +741,7 @@ th {
             <div id="id_computerDetails" style="font-size:16px;margin:4px"></div>
         </div>
                     </div>
-    <div id="id_computerSelectorMenu" style="background-color:#EEEEEE;display:none;position:absolute;left:0;top:94px;width:200px;padding:3px;z-index:1000;box-shadow:5px 5px 5px #888888;border:1px solid gray">
+    <div id="id_computerSelectorMenu" style="background-color:var(--dialog-bg);display:none;position:absolute;left:0;top:94px;width:200px;padding:3px;z-index:1000;box-shadow:5px 5px 5px var(--shadow);border:1px solid var(--border)">
         <div class="menuitem" onclick="toolmenuclick(101)"><span id="id_menuitem1">&bull; </span>Computer Management</div>
                         <div class="menuitem" onclick="toolmenuclick(102)"><span id="id_menuitem2" style="display:none">&bull; </span>USB Setup.bin Editor</div>
                         <div class="menuitem" onclick="toolmenuclick(104)"><span id="id_menuitem4" style="display:none">&bull; </span>Session Player</div>
@@ -839,6 +865,7 @@ th {
                 <div style="float:right"><input type="button" value="Stop Script" onclick="script_Stop()"></div>
                 <div style="font-size:16px;padding-top:2px;overflow:hidden">&nbsp;<b>Running Script</b><span style="overflow:hidden" id="id_scriptstatusstr"></span></div>
             </div>
+                                    <div id="id_tlsWarning" style="height:21px;background:#fff3cd;padding:5px;margin-bottom:1px;display:none;color:#856404;font-weight:bold">&#9888; Insecure connection (no TLS) - Credentials sent in clear text. Use TLS port 16993.</div>
                                     <div id="id_versionWarning" style="height:21px;background:#8fac8d;padding:5px;margin-bottom:1px;display:none">
                 <div style="font-size:16px;float:right;cursor:pointer;padding-right:5px;padding-left:5px;padding-top:2px;font-size:15px" onclick="QV('id_versionWarning', false)">&#x2716;</div>
                                                 <div style="font-size:14px;padding-top:2px">&nbsp;<b>This computer's firmware should be updated,&nbsp;<a style="cursor:pointer" href="https://security-center.intel.com/advisory.aspx?intelid=INTEL-SA-00075&languageid=en-fr" rel="noreferrer noopener" target="_blank"><u>please check here</u></a>.</b></div>
@@ -1043,6 +1070,7 @@ th {
                                         &nbsp;
                                     </span>
                                     <input id="id_DeskCAD" type="button" value="Ctrl-Alt-Del" onkeypress="return false" onkeydown="return false" onclick="sendCAD()">&nbsp;
+                                    <input type="button" id="deskClipPaste" value="Paste" title="Paste clipboard to remote" onkeypress="return false" onkeydown="return false" onclick="kvmClipboardPaste()" style="margin-right:3px">&nbsp;
                                                                         <span id="id_DeskSBspan"><input id="id_DeskSB" type="checkbox"> Blank Screen&nbsp;</span>
                                     <span id="id_DeskVOspan"><input id="id_DeskVO" type="checkbox"> View only&nbsp;</span>
                                 </div>
@@ -1171,8 +1199,8 @@ th {
                             </div>
         </div>
     </div>
-            <div id="dialog" style="z-index:1000;background-color:#EEE;box-shadow:0px 0px 15px #666;font-family:Arial, Helvetica, sans-serif;border-radius:5px;position:fixed;top:160px;width:400px;display:none">
-            <div style="width:100%;background-color:#003366;color:#FFF;border-radius:5px 5px 0 0">
+            <div id="dialog" style="z-index:1000;background-color:var(--dialog-bg);box-shadow:0px 0px 15px var(--shadow);font-family:system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;border-radius:5px;position:fixed;top:160px;width:400px;display:none">
+            <div style="width:100%;background-color:var(--dialog-header);color:#FFF;border-radius:5px 5px 0 0">
             <div id='id_dialogclose' style="float:right;padding:1px;margin-right:5px;cursor:pointer;font-size:15px" onclick="setDialogMode()">&#x2716;</div>
             <div id='id_dialogtitle' style="padding:5px"></div>
             <div style="width:100%;margin:6px"></div>
@@ -1201,7 +1229,7 @@ th {
                 <div style='height:26px'><input id="d4name" style="float:right;width:200px" onkeyup="updateComputerDialog()"><div>Friendly Name</div></div>
                 <div style='height:26px'><input id="d4tags" list="d4devGroups" style="float:right;width:200px" placeholder="MyGroup"><div>Group Name</div></div>
                 <div style='height:26px'><input id="d4hostname" style="float:right;width:200px" onkeyup="updateComputerDialog()"><div>Hostname</div></div>
-                <div style='height:26px'><select id="d4security" style="float:right;width:200px" onchange="updateComputerDialog()"><option value="0">Digest / None<option value="1">Digest / TLS<option value="2">Kerberos / None<option value="3">Kerberos / TLS</select><div>Auth / Security</div></div>
+                <div style='height:26px'><select id="d4security" style="float:right;width:200px" onchange="updateComputerDialog()"><option value="0">Digest / None<option value="1" selected>Digest / TLS<option value="2">Kerberos / None<option value="3">Kerberos / TLS</select><div>Auth / Security</div></div>
                 <div id="d4digest">
                     <div style='height:26px'><input id="d4username" value="admin" style="float:right;width:200px" onkeyup="updateComputerDialog()"><div>Username</div></div>
                     <div style='height:26px'><input id="d4password" type="password" autocomplete="off" style="float:right;width:200px" onkeyup="updateComputerDialog()"><div>Password*</div></div>
@@ -35366,6 +35394,7 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
             } else {
                 console.log('Got KVM clipboard data:', d);
                 try { if (urlvars && urlvars['kvmdatatrace']) { console.log('KVM-ClipBoard-Recv(' + d.length + '): ' + rstr2hex(d) + ', ' + d); } } catch (ex) { }
+                if (d.length > 0 && d.charCodeAt(0) != 0) { try { navigator.clipboard.writeText(d); } catch(e) {} }
             }
         }
         
@@ -41237,6 +41266,9 @@ if (typeof module !== 'undefined' && module.exports) {
             if (!x || !x['computers']) {
                 messagebox("Open File", "Invalid or corrupt computer list file. Unable to open.");
             } else {
+                if (x.desktopsettings) { try { localStorage.setItem('desktopsettings', JSON.stringify(x.desktopsettings)); } catch(e) {} }
+                if (x.terminalsettings) { try { localStorage.setItem('terminalsettings', JSON.stringify(x.terminalsettings)); } catch(e) {} }
+                if (x.darkMode) { try { localStorage.setItem('darkMode', x.darkMode); if (x.darkMode === '1') document.documentElement.classList.add('dark-mode'); } catch(e) {} }
 
                 idx_d18computerfilename.value = name;
 
@@ -41269,10 +41301,11 @@ if (typeof module !== 'undefined' && module.exports) {
         function saveComputerListOk() {
             var computerlist2 = Clone(computerlist);
             for (var i in computerlist2) { delete computerlist2[i]['h']; delete computerlist2[i].checked; delete computerlist2[i]['consolemsg']; }
-
-            saveAs(data2blob(JSON.stringify({ 'webappversion':version, 'computers':computerlist2 }, null, '  ').replace(/\n/g, '\r\n')), idx_d18computerfilename.value);
-
-
+            var exportData = { 'webappversion': version, 'computers': computerlist2 };
+            try { var ds = localStorage.getItem('desktopsettings'); if (ds) exportData.desktopsettings = JSON.parse(ds); } catch(e) {}
+            try { var ts = localStorage.getItem('terminalsettings'); if (ts) exportData.terminalsettings = JSON.parse(ts); } catch(e) {}
+            try { exportData.darkMode = localStorage.getItem('darkMode'); } catch(e) {}
+            saveAs(data2blob(JSON.stringify(exportData, null, '  ').replace(/\n/g, '\r\n')), idx_d18computerfilename.value);
         }
 
         function getEncryptedData(dataStr, password) {
@@ -45001,6 +45034,7 @@ if (typeof module !== 'undefined' && module.exports) {
                     break;
             }
 
+            QV('id_tlsWarning', (state == 3 && terminal.m.tls == 0));
         }
 
         function termPaste() { terminal.m.TermSendKeys(d3pastetextarea.value); return false; }
@@ -45320,8 +45354,17 @@ if (typeof module !== 'undefined' && module.exports) {
         // Update screen icons
         function UpdateDesktopDisplayInfo() {
             var buttons = '', activeScreens = 0;
-            for (var i = 0; i < 3; i++) { if (desktopScreenInfo['IsActive'][i] == true) { activeScreens++; buttons += '<input type="button" ' + ((i == desktopScreenInfo.KVMRSD['DefaultScreen'])?'style="background-color:DodgerBlue"':'') + ' value="' + (i + 1) + '" title="Switch to screen ' + (i + 1) + '" onkeypress="return false" onkeydown="return false" onclick="desktopSwitchScreen(' + i + ')">&nbsp;'; } }
-            if (activeScreens > 1) { Q('id_DeskScreenSelector').innerHTML = buttons + '&nbsp;'; } else { Q('id_DeskScreenSelector').innerHTML = ''; }
+            for (var i = 0; i < 3; i++) {
+                if (desktopScreenInfo['IsActive'][i] == true) {
+                    activeScreens++;
+                    var isActive = (i == desktopScreenInfo.KVMRSD['DefaultScreen']);
+                    buttons += '<div style="display:inline-block;text-align:center;margin:0 3px;cursor:pointer" onclick="desktopSwitchScreen(' + i + ')" title="Screen ' + (i+1) + '">';
+                    buttons += '<div style="width:28px;height:20px;border:2px solid ' + (isActive ? 'var(--monitor-active)' : 'var(--text-secondary)') + ';border-radius:3px 3px 0 0;background:' + (isActive ? 'var(--monitor-active)' : 'transparent') + ';color:' + (isActive ? '#fff' : 'var(--text)') + ';font-size:11px;line-height:20px;font-weight:bold">' + (i+1) + '</div>';
+                    buttons += '<div style="width:12px;height:4px;margin:0 auto;background:' + (isActive ? 'var(--monitor-active)' : 'var(--text-secondary)') + ';border-radius:0 0 2px 2px"></div>';
+                    buttons += '</div>';
+                }
+            }
+            if (activeScreens > 1) { Q('id_DeskScreenSelector').innerHTML = buttons; } else { Q('id_DeskScreenSelector').innerHTML = ''; }
         }
 
         // Request switch to a different desktop
@@ -45375,6 +45418,7 @@ if (typeof module !== 'undefined' && module.exports) {
                     break;
             }
 
+            QV('id_tlsWarning', (state == 3 && desktop.m.tls == 0));
             center();
             updateDesktopState();
             if (reconnect) { setTimeout(connectDesktop, 200); }
@@ -49516,6 +49560,25 @@ if (typeof module !== 'undefined' && module.exports) {
         function format(format) { var args = Array.prototype.slice.call(arguments, 1); return format.replace(/{(\d+)}/g, function (match, number) { return typeof args[number] != 'undefined' ? args[number] : match; }); };
 
 
+
+        function kvmClipboardPaste() {
+            if (desktop.State != 3) return;
+            navigator.clipboard.readText().then(function(text) {
+                if (text && text.length > 0) {
+                    var buf = String.fromCharCode(6, 0, 0, 0) + IntToStr(text.length) + text;
+                    desktop.m.send(buf);
+                }
+            }).catch(function(e) {});
+        }
+
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark-mode');
+            var isDark = document.documentElement.classList.contains('dark-mode');
+            try { localStorage.setItem('darkMode', isDark ? '1' : '0'); } catch(e) {}
+            Q('darkModeBtn').innerHTML = isDark ? '&#9788;' : '&#9790;';
+        }
+        // Update dark mode button icon on load
+        try { if (localStorage.getItem('darkMode') === '1' && Q('darkModeBtn')) { Q('darkModeBtn').innerHTML = '&#9788;'; } } catch(e) {}
 
         // Get things started
         startup();
