@@ -90,7 +90,7 @@ var CreateAmtRemoteIder = function () {
     obj.ProcessData = function (data) {
         obj.bytesFromAmt += data.length;
         obj.acc += data;
-        debug('IDER-ProcessData', obj.acc.length, rstr2hex(obj.acc));
+        debug('IDER-ProcessData', obj.acc.length);
 
         // Process as many commands as possible
         while (true) {
@@ -215,7 +215,7 @@ var CreateAmtRemoteIder = function () {
                         debug("IDER Status: " + obj.enabled);
                         break;
                     case 3: // REGS_TOGGLE
-                        if (value != 1) { debug("Register toggle failure"); } //else { obj.SendDisableEnableFeatures(2); }
+                        if (value != 1) { debug("Register toggle failure", value); } else { debug("Register toggle success"); obj.SendDisableEnableFeatures(2); }
                         break;
                 }
                 return 13;
@@ -364,8 +364,8 @@ var CreateAmtRemoteIder = function () {
                         debug('DEV_FLOPPY', len); // Number 512 byte blocks
                         break;
                     case 0xB0: // DEV_CDDVD
-                        if ((obj.floppy == null) || (obj.floppy.size == 0)) { obj.SendCommandEndResponse(0, 0x02, dev, 0x3a, 0x00); return -1; }
-                        if (obj.cdrom != null) { len = (obj.cdrom.size >> 11) - 1; } // Number 2048 byte blocks
+                        if ((obj.cdrom == null) || (obj.cdrom.size == 0)) { obj.SendCommandEndResponse(0, 0x02, dev, 0x3a, 0x00); return -1; }
+                        len = (obj.cdrom.size >> 11) - 1; // Number 2048 byte blocks
                         debug('DEV_CDDVD', len);
                         break;
                     default:

@@ -50,12 +50,7 @@ function createWindow() {
 
     mainWindow.loadURL('http://127.0.0.1:' + serverPort);
 
-    // Open DevTools with F12
-    mainWindow.webContents.on('before-input-event', (event, input) => {
-        if (input.key === 'F12') { mainWindow.webContents.toggleDevTools(); }
-    });
-
-    mainWindow.on('closed', () => {
+mainWindow.on('closed', () => {
         mainWindow = null;
     });
 }

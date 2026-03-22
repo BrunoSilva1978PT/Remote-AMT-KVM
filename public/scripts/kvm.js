@@ -160,10 +160,18 @@ var deskkeysset = {
     15: [[0xffc7, 1], [0xffc7, 0]], 16: [[0xffc8, 1], [0xffc8, 0]], 17: [[0xffc9, 1], [0xffc9, 0]],
     19: [[0xffe9, 1], [0xff09, 1], [0xff09, 0], [0xffe9, 0]], 20: [[0xffe7, 1], [0x72, 1], [0x72, 0], [0xffe7, 0]],
     21: [[0xffe9, 1], [0xffc1, 1], [0xffc1, 0], [0xffe9, 0]], 22: [[0xffe3, 1], [0x77, 1], [0x77, 0], [0xffe3, 0]],
-    23: [[0xffe7, 1], [0xff51, 1], [0xff51, 0], [0xffe7, 0]], 24: [[0xffe7, 1], [0xff53, 1], [0xff53, 0], [0xffe7, 0]]
+    23: [[0xffe7, 1], [0xff51, 1], [0xff51, 0], [0xffe7, 0]], 24: [[0xffe7, 1], [0xff53, 1], [0xff53, 0], [0xffe7, 0]],
+    25: [[0xff1b, 1], [0xff1b, 0]], 26: [[0xffff, 1], [0xffff, 0]],
+    27: [[43, 1], [43, 0]], 28: [[45, 1], [45, 0]], 29: [[120, 1], [120, 0]]
 };
 
-function deskSendKeys() { if (Q('id_DeskVO').checked) return; var ks = Q('deskkeys').value; if (ks != null && deskkeysset[ks] && desktop.State != 0) { for (var i = 0; i < deskkeysset[ks].length; i++) desktop.m.sendkey(deskkeysset[ks][i][0], deskkeysset[ks][i][1]); } }
+function deskSendKeys() {
+    if (Q('id_DeskVO').checked) return;
+    var ks = parseInt(Q('deskkeys').value);
+    if (!isNaN(ks) && deskkeysset[ks] && desktop && desktop.State == 3) {
+        for (var i = 0; i < deskkeysset[ks].length; i++) desktop.m.sendkey(deskkeysset[ks][i][0], deskkeysset[ks][i][1]);
+    }
+}
 
 function dmousedown(e) { if (!xxdialogMode && !Q('id_DeskVO').checked) desktop.m.mousedown(e); }
 function dmouseup(e) { if (!xxdialogMode && !Q('id_DeskVO').checked) desktop.m.mouseup(e); }
@@ -451,7 +459,7 @@ function onIderFileSelected(e) {
     // Set the ISO/IMG as CD-ROM media
     ider.m.cdrom = file;
     ider.m.floppy = null;
-    ider.m.iderStart = 2; // Start now
+    ider.m.iderStart = 0; // OnReboot - firmware detects device during boot
 
     // Connect IDER to the AMT device using same credentials as KVM
     if (ider.State == 0) {
