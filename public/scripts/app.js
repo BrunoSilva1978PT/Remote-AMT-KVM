@@ -25,6 +25,7 @@ var urlvars = {};
 var amtstack;
 var wsstack = null;
 var desktop;
+var ider;
 var desktopsettings = { encflags: 1, showfocus: false, showmouse: true, showcad: true, limitFrameRate: false, noMouseRotate: false, decimationMode: 2 };
 var StatusStrs = ["Disconnected", "Connecting...", "Setup...", "Connected"];
 var currentView = 0;
@@ -103,6 +104,10 @@ function startup() {
     desktop = CreateAmtRedirect(CreateAmtRemoteDesktop('Desk', Q('id_mainarea')));
     desktop.onStateChanged = onDesktopStateChange;
     QE('idx_connectbutton1', true);
+
+    // Setup IDE-R (virtual media redirection)
+    ider = CreateAmtRedirect(CreateAmtRemoteIder());
+    ider.onStateChanged = onIderStateChange;
     // Load settings from server (persistent across sessions)
     loadSettings(function() { applyDesktopSettings(); });
 

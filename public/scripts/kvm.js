@@ -436,3 +436,59 @@ function showOcrResult(text, copied) {
     dlg.setAttribute('tabindex', '-1'); dlg.focus();
     dlg.addEventListener('keydown', function(e) { if (e.key === 'Escape') dlg.remove(); e.stopPropagation(); });
 }
+
+// ========== IDE-R (Virtual Media) ==========
+
+function mountIderImage() {
+    Q('iderFileInput').click();
+}
+
+function onIderFileSelected(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    e.target.value = ''; // Reset so same file can be re-selected
+
+    // Set the ISO/IMG as CD-ROM media
+    ider.m.cdrom = file;
+    ider.m.floppy = null;
+    ider.m.iderStart = 2; // Start now
+
+    // Connect IDER to the AMT device using same credentials as KVM
+    if (ider.State == 0) {
+        ider.Start(ports.host, ports.redir, amtstack.wsman.comm.user, amtstack.wsman.comm.pass, currentcomputer['tls']);
+    }
+}
+
+function ejectIder() {
+    if (ider.State != 0) {
+        ider.m.cdrom = null;
+        ider.m.floppy = null;
+        ider.Stop();
+    }
+    updateIderUI();
+}
+
+function onIderStateChange(obj, state) {
+    updateIderUI();
+    if (state == 0 && ider.m) {
+        ider.m.cdrom = null;
+        ider.m.floppy = null;
+    }
+}
+
+function updateIderUI() {
+    var connected = (ider && ider.State == 3);
+    var hasMedia = (ider && ider.m && (ider.m.cdrom || ider.m.floppy));
+    QV('iderEjectBtn', connected);
+    if (connected && hasMedia) {
+        var name = ider.m.cdrom ? ider.m.cdrom.name : ider.m.floppy.name;
+        Q('iderStatus').textContent = '💿 ' + name;
+        Q('iderMountBtn').value = '💿 Change ISO';
+    } else if (ider && ider.State > 0) {
+        Q('iderStatus').textContent = 'Connecting...';
+        Q('iderMountBtn').value = '💿 Mount ISO';
+    } else {
+        Q('iderStatus').textContent = '';
+        Q('iderMountBtn').value = '💿 Mount ISO';
+    }
+}

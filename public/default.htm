@@ -235,6 +235,12 @@ th:hover { cursor: pointer; background: var(--hover); }
                                 <input id="DeskRecordButton" type="button" value="&#9679; Rec" title="Record remote desktop session to file" onclick="deskRecordSession()" style="font-size:9pt !important;padding:2px 8px !important">
                                 <input id="DeskSaveImageButton" type="button" value="&#128247; Snapshot" title="Save a screenshot" onclick="deskSaveImage()" style="font-size:9pt !important;padding:2px 8px !important">
                             </div>
+                            <div id="id_IderTools" style="float:right;display:flex;gap:4px;align-items:center;margin-right:12px">
+                                <input id="iderMountBtn" type="button" value="&#128191; Mount ISO" title="Mount an ISO/IMG file as virtual CD-ROM" onclick="mountIderImage()" onkeypress="return false" onkeydown="return false" style="font-size:9pt !important;padding:2px 8px !important">
+                                <span id="iderStatus" style="font-size:11px;opacity:0.7"></span>
+                                <input id="iderEjectBtn" type="button" value="&#9167; Eject" title="Eject virtual media and disconnect IDER" onclick="ejectIder()" onkeypress="return false" onkeydown="return false" style="font-size:9pt !important;padding:2px 8px !important;display:none">
+                                <input type="file" id="iderFileInput" accept=".iso,.img" style="display:none" onchange="onIderFileSelected(event)">
+                            </div>
                             <div id="id_DeskScreenSelector" style="float:right"></div>
                             <div>
                                 &nbsp;
@@ -381,6 +387,7 @@ th:hover { cursor: pointer; background: var(--hover); }
     <script src="scripts/amt-wsman-ws-0.2.0.js"></script>
     <script src="scripts/amt-redir-ws-0.1.0.js"></script>
     <script src="scripts/amt-desktop-0.0.2.js"></script>
+    <script src="scripts/amt-ider-ws-0.0.1.js"></script>
     <script src="scripts/amt-0.2.0.js"></script>
 
     <!-- Custom Application Scripts -->
