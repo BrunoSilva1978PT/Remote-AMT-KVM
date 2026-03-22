@@ -107,7 +107,7 @@ function showDesktopSettingsChanged() {
     desktopsettings.noMouseRotate = d7noMouseRotate.checked;
     desktopsettings.quality = d7bitmapquality.value;
     desktopsettings.scaling = d7bitmapscaling.value;
-    try { localStorage.setItem('desktopsettings', JSON.stringify(desktopsettings)); } catch (ex) { }
+    saveSettings();
     applyDesktopSettings();
     if (desktopsettings.showfocus == false) { desktop.m.focusmode = 0; idx_deskFocusBtn.value = "All Focus"; }
     desktop.m.frameRateDelay = (desktopsettings.limitFrameRate == true)?200:0;
@@ -187,9 +187,9 @@ function deskToggleFocus() { desktop.m.focusmode = (desktop.m.focusmode + 64) % 
 function deskRecordSession() {
     if ((desktop == null) || (urlvars && urlvars['norecord'])) return;
     if (desktop.m.recordedData == null) {
-        if ((desktop.State === 3) && (desktop.m.StartRecording())) { Q('DeskRecordButton').classList.remove('videoIcon'); Q('DeskRecordButton').classList.add('videoIconRed'); }
+        if ((desktop.State === 3) && (desktop.m.StartRecording())) { Q('DeskRecordButton').style.color = '#ff4444'; Q('DeskRecordButton').value = '\u25CF REC'; }
     } else {
-        Q('DeskRecordButton').classList.remove('videoIconRed'); Q('DeskRecordButton').classList.add('videoIcon');
+        Q('DeskRecordButton').style.color = ''; Q('DeskRecordButton').value = '\u25CF Rec';
         var d = new Date(), n = 'AmtDesktopSession-' + (currentcomputer['name']||'') + '-' + d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
         saveAs(data2blob(desktop.m.StopRecording().join('')), n + '.mcrec');
     }

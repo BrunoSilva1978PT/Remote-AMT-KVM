@@ -295,3 +295,6 @@ __pycache__/
 *.odx.cs
 *.xsd.cs
 Thumbs.db
+
+.claude/
+*.config

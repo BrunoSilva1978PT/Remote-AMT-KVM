@@ -20,7 +20,7 @@ var saveAs = saveAs || (function(view) {
 
 // ========== GLOBAL VARIABLES ==========
 
-var version = '0.9.5';
+var version = '1.0';
 var urlvars = {};
 var amtstack;
 var wsstack = null;
@@ -70,6 +70,27 @@ var httpErrorTable = {
 
 var DMTFPowerStates = ['', '', "Power on", "Light sleep", "Deep sleep", "Power cycle (Soft off)", "Off - Hard", "Hibernate (Off soft)", "Soft off", "Power cycle (Off-hard)", "Main bus reset", "Diagnostic interrupt (NMI)", "Not applicable", "Off - Soft graceful", "Off - Hard graceful", "Master bus reset graceful", "Power cycle (Off - Soft graceful)", "Power cycle (Off - Hard graceful)", "Diagnostic interrupt (INIT)"];
 
+// ========== SETTINGS PERSISTENCE ==========
+
+function loadSettings(callback) {
+    var x = new XMLHttpRequest();
+    x.onreadystatechange = function() {
+        if (x.readyState == 4) {
+            if (x.status == 200) { try { var s = JSON.parse(x.responseText); if (s.desktopsettings) { desktopsettings = s.desktopsettings; } } catch (e) {} }
+            if (callback) callback();
+        }
+    };
+    x.open('GET', '/settings.ashx', true);
+    x.send();
+}
+
+function saveSettings() {
+    var x = new XMLHttpRequest();
+    x.open('POST', '/settings.ashx', true);
+    x.setRequestHeader('Content-Type', 'application/json');
+    x.send(JSON.stringify({ desktopsettings: desktopsettings }));
+}
+
 // ========== STARTUP ==========
 
 function startup() {
@@ -82,9 +103,8 @@ function startup() {
     desktop = CreateAmtRedirect(CreateAmtRemoteDesktop('Desk', Q('id_mainarea')));
     desktop.onStateChanged = onDesktopStateChange;
     QE('idx_connectbutton1', true);
-    try { t = localStorage.getItem('desktopsettings'); } catch (ex) {}
-    if (t) { desktopsettings = JSON.parse(t); }
-    applyDesktopSettings();
+    // Load settings from server (persistent across sessions)
+    loadSettings(function() { applyDesktopSettings(); });
 
     // Main drag & drop
     document.addEventListener('dragover', haltEvent, false);
@@ -92,7 +112,7 @@ function startup() {
     document.addEventListener('drop', documentFileSelectHandler, false);
 
     if (!urlvars['host']) { go(101); }
-    QH('id_computername', format("Remote Management Console v{0}", version));
+    QH('id_computername', format("Remote-AMT-KVM v{0}", version));
 
     if (urlvars['host']) {
         var xuser = urlvars['user'] || '*';
@@ -202,7 +222,7 @@ function disconnect() {
     delete amtstack;
     onProcessChanged(0, 1);
     go(101);
-    QH('id_computername', format("Remote Management Console v{0}", version));
+    QH('id_computername', format("Remote-AMT-KVM v{0}", version));
 }
 
 function onProcessChanged(a, b) {
@@ -345,16 +365,17 @@ function updateComputerList() {
         extra.push((computer['tls'] == 0) ? "No&nbsp;Security" : "TLS");
         var name = decodeURIComponent(computer['host']);
         if (computer['name'] && computer['name'] != '') name = decodeURIComponent(computer['name']);
+        var tlsColor = (computer['tls'] == 0) ? '#ff6b6b' : '#00d4aa';
         var x = '<div id=CX-' + computer['h'] + ' ondblclick=computerEdit(' + computer['h'] + ')>';
-        x += '<div><table style="height:24px;width:calc(100% - 10px);margin:3px;cursor:pointer;border:none" cellspacing=0 cellpadding=0';
+        x += '<div><table style="height:32px;width:calc(100% - 8px);margin:2px 4px;cursor:pointer;border:none;border-radius:4px" cellspacing=0 cellpadding=0';
         var cmenus = ["Connect#computerConnect(event," + computer['h'] + ")", "Edit...#computerEdit(" + computer['h'] + ")"];
         x += ' cm=\'' + cmenus.join('|') + '\'';
         x += ' onclick="computerSelect(event, ' + computer['h'] + ')" id=CI-' + computer['h'] + '>';
-        x += '<td id=LCX-' + computer['h'] + ' class=g1 style=float:none>&nbsp;</td>';
-        x += '<td style=width:10px><input id=SJ-' + computer['h'] + ' type=checkbox onclick=onComputerChecked()' + (computer.checked?' checked':'') + ' /></td>';
-        x += '<td align=left><b style=font-size:16px>' + EscapeHtml(name) + '</b></td>';
-        x += '<td align=right style=padding-right:5px>' + extra.join(', ') + '</td><td style=width:1px;padding-right:5px>' + AddButton2("Connect", 'computerConnect(event,' + computer['h'] + ')') + '</td>';
-        x += '<td id=RCX-' + computer['h'] + ' class=g2 style=float:none>&nbsp;</td>';
+        x += '<td id=LCX-' + computer['h'] + ' style="width:3px;background:' + tlsColor + ';border-radius:4px 0 0 4px;float:none">&nbsp;</td>';
+        x += '<td style=width:10px;padding-left:6px><input id=SJ-' + computer['h'] + ' type=checkbox onclick=onComputerChecked()' + (computer.checked?' checked':'') + ' /></td>';
+        x += '<td align=left style=padding-left:8px><b style=font-size:14px>' + EscapeHtml(name) + '</b></td>';
+        x += '<td align=right style="padding-right:8px;font-size:9pt;color:#8892b0">' + extra.join(', ') + '</td><td style=width:1px;padding-right:6px>' + AddButton2("Connect", 'computerConnect(event,' + computer['h'] + ')') + '</td>';
+        x += '<td id=RCX-' + computer['h'] + ' style="width:3px;background:' + tlsColor + ';border-radius:0 4px 4px 0;float:none">&nbsp;</td>';
         x += '</table></div></div>';
         groupHtml[group] += x;
     }
@@ -362,7 +383,7 @@ function updateComputerList() {
     if (computerlist.length > 0) {
         var x = '';
         for (var y in groups) {
-            if (groups[y] != '') { x += '<div style="font-size:14px;border-bottom:1px solid lightgray;margin-left:4px;margin-top:6px"><b>' + EscapeHtml(groups[y]) + '</b></div>'; }
+            if (groups[y] != '') { x += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8892b0;border-bottom:1px solid #2a3a5c;margin:4px 8px;padding:8px 0 4px 0"><b>' + EscapeHtml(groups[y]) + '</b></div>'; }
             x += groupHtml[groups[y]];
         }
         QH('id_computerList', '<div style=width:99%>' + x + '</div>');
@@ -372,19 +393,20 @@ function updateComputerList() {
 
 function onComputerChecked() { for (var y in computerlist) { computerlist[y].checked = Q('SJ-' + computerlist[y]['h']).checked; } }
 
-function addComputerDetailsEntry(x, y) { return '<div style="border-radius:4px;padding:3px;margin-bottom:3px;background-color:var(--bg-alt);border:1px solid var(--border)"><div style=width:100%;font-size:9px>' + x + '</div><div style=width:100%>&nbsp;' + y + '</div></div>'; }
+function addComputerDetailsEntry(x, y) { return '<div style="border-radius:6px;padding:8px 10px;margin-bottom:6px;background-color:#0d1b30;border:1px solid #2a3a5c"><div style="width:100%;font-size:9px;color:#8892b0;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">' + x + '</div><div style="width:100%;font-size:13px;color:#e0e0e0">' + y + '</div></div>'; }
 
 function updateComputerDetails() {
     var x = '<div style=position:absolute;top:0;right:0;left:0;bottom:0>';
     if (currentcomputer != null) {
-        x += '<div style=position:absolute;top:4px;left:4px;right:4px;bottom:80px>';
-        if (currentcomputer['name']) x += '<div style=width:100%;text-align:center><b>' + EscapeHtml(decodeURIComponent(currentcomputer['name'])) + '</b></div>';
+        x += '<div style="position:absolute;top:8px;left:8px;right:8px;text-align:center">';
+        var detailName = currentcomputer['name'] ? EscapeHtml(decodeURIComponent(currentcomputer['name'])) : EscapeHtml(decodeURIComponent(currentcomputer['host']));
+        x += '<div style="font-size:14px;font-weight:700;color:#00d4aa;margin-bottom:4px">' + detailName + '</div>';
         x += '</div>';
-        var bottomButtons = '<div style=position:absolute;bottom:8px;left:4px;right:4px>';
-        bottomButtons += '<input type=Button value="Edit..." style=width:146px onclick=computerEdit(' + currentcomputer['h'] + ')>';
-        bottomButtons += '<input type=Button value="Connect" style=width:146px onclick=computerConnect(event,' + currentcomputer['h'] + ')>';
+        var bottomButtons = '<div style="position:absolute;bottom:8px;left:8px;right:8px;display:flex;gap:6px">';
+        bottomButtons += '<input type=Button value="Edit..." style="flex:1" onclick=computerEdit(' + currentcomputer['h'] + ')>';
+        bottomButtons += '<input type=Button value="Connect" style="flex:1;background:#0f3460 !important;border-color:#00d4aa !important;color:#00d4aa !important" onclick=computerConnect(event,' + currentcomputer['h'] + ')>';
         bottomButtons += '</div>';
-        x += '<div style="overflow-y:auto;position:absolute;top:30px;left:4px;right:4px;bottom:54px">';
+        x += '<div style="overflow-y:auto;position:absolute;top:38px;left:8px;right:8px;bottom:48px">';
         x += addComputerDetailsEntry("Host Name", decodeURIComponent(currentcomputer['host']));
         x += addComputerDetailsEntry("Authentication", EscapeHtml(decodeURIComponent(currentcomputer['user']||'')));
         x += addComputerDetailsEntry("Security", ((currentcomputer['tls'] == 0) ? "None" : "TLS Security"));
@@ -466,9 +488,8 @@ function computerSelect(e, h) {
     if (h && ((currentcomputer == null) || (currentcomputer.h !== h))) { currentcomputer = getComputer(h); updateComputerDetails(); }
     for (var y in computerlist) {
         var computer = computerlist[y], sel = (currentcomputer != null && computer['h'] == currentcomputer['h']);
-        QS('CI-' + computer['h'])['background-color'] = sel ? 'var(--item-hover)' : 'var(--item-bar)';
-        Q('LCX-' + computer['h']).classList.remove('g1','g1s'); Q('RCX-' + computer['h']).classList.remove('g2','g2s');
-        Q('LCX-' + computer['h']).classList.add(sel?'g1s':'g1'); Q('RCX-' + computer['h']).classList.add(sel?'g2s':'g2');
+        QS('CI-' + computer['h'])['background-color'] = sel ? '#1a3a5c' : '#1e2d4a';
+        QS('CI-' + computer['h'])['border'] = sel ? '1px solid #00d4aa' : '1px solid transparent';
     }
 }
 

@@ -1,16 +1,16 @@
 {
-  "name": "meshcommander",
-  "version": "0.9.6",
-  "description": "Intel(R) Active Management Technology console tool",
+  "name": "remote-amt-kvm",
+  "version": "1.0.0",
+  "description": "Remote AMT KVM - Intel AMT Remote Management Console",
   "main": "main.js",
-  "author": "Intel Corporation",
+  "author": "",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win"
   },
   "build": {
-    "appId": "com.meshcommander.app",
-    "productName": "MeshCommander",
+    "appId": "com.remote-amt-kvm.app",
+    "productName": "Remote-AMT-KVM",
     "win": {
       "target": "nsis",
       "icon": "favicon.ico"

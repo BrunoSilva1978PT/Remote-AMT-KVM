@@ -39,8 +39,28 @@ module.exports.CreateWebServer = function (args) {
         res.redirect('/default.htm');
     });
     
-    // Computer list config file path - use external path if provided (for Electron/asar), fallback to local
+    // Config file paths - use external path if provided (for Electron/asar), fallback to local
     obj.configPath = args.configPath || obj.path.join(__dirname, 'computerlist.config');
+    obj.settingsPath = args.settingsPath || obj.path.join(__dirname, 'settings.json');
+
+    // Get settings
+    obj.app.get('/settings.ashx', function (req, res) {
+        res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0', 'Content-Type': 'application/json' });
+        obj.fs.readFile(obj.settingsPath, 'utf8', function (err, data) {
+            if (err) { res.send('{}'); return; }
+            try { JSON.parse(data); res.send(data); } catch (e) { res.send('{}'); }
+        });
+    });
+
+    // Save settings
+    obj.app.post('/settings.ashx', obj.express.json(), function (req, res) {
+        res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' });
+        if (typeof req.body !== 'object') { res.status(400).send('Invalid data'); return; }
+        obj.fs.writeFile(obj.settingsPath, JSON.stringify(req.body, null, 2), 'utf8', function (err) {
+            if (err) { res.status(500).send('Failed to save'); return; }
+            res.send('OK');
+        });
+    });
 
     // Get computer list
     obj.app.get('/webrelay.ashx', function (req, res) {
@@ -183,9 +203,9 @@ module.exports.CreateWebServer = function (args) {
     if (args.port != null) { port = parseInt(args.port); }
     if (isNaN(port) || (port == null) || (typeof port != 'number') || (port < 0) || (port > 65536)) { port = 3000; }
     if (args.any != null) {
-        obj.app.listen(port, function () { console.log("MeshCommander running on http://*:" + port + '.'); });
+        obj.app.listen(port, function () { console.log("Remote-AMT-KVM running on http://*:" + port + '.'); });
     } else {
-        obj.app.listen(port, '127.0.0.1', function () { console.log("MeshCommander running on http://127.0.0.1:" + port + '.'); });
+        obj.app.listen(port, '127.0.0.1', function () { console.log("Remote-AMT-KVM running on http://127.0.0.1:" + port + '.'); });
     }
 
     return obj;

@@ -20,7 +20,7 @@ function startMeshCommander(port) {
     const webserver = require('./meshcommander/webserver.js');
     // Use userData path for writable config (asar is read-only)
     const configDir = app.getPath('userData');
-    webserver.CreateWebServer({ port: port, configPath: path.join(configDir, 'computerlist.config') });
+    webserver.CreateWebServer({ port: port, configPath: path.join(configDir, 'computerlist.config'), settingsPath: path.join(configDir, 'settings.json') });
 }
 
 function createWindow() {
@@ -30,7 +30,7 @@ function createWindow() {
         minWidth: 970,
         minHeight: 640,
         icon: path.join(__dirname, 'favicon.png'),
-        title: 'MeshCommander',
+        title: 'Remote-AMT-KVM',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true

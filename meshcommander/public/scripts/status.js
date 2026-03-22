@@ -134,7 +134,9 @@ function updateSystemStatus() {
         currentcomputer['date'] = new Date().toISOString();
         saveComputers();
     }
-    QH('id_computername', "Computer: " + ((gs['HostName'] == '') ? '<i>None</i>' : gs['HostName']));
+    var hostName = gs['HostName'];
+    if (!hostName || hostName == '') { hostName = (currentcomputer && currentcomputer['name']) ? decodeURIComponent(currentcomputer['name']) : ((currentcomputer && currentcomputer['host']) ? decodeURIComponent(currentcomputer['host']) : ''); }
+    QH('id_computername', format("Remote-AMT-KVM v{0}", version) + (hostName ? ' <span style="color:#8892b0;font-size:10pt;font-weight:400">&mdash; ' + EscapeHtml(hostName) + '</span>' : ''));
     if (amtsysstate['CIM_ServiceAvailableToElement'] != null && amtsysstate['CIM_ServiceAvailableToElement'].responses != null && amtsysstate['CIM_ServiceAvailableToElement'].responses.length > 0) {
         QV('id_p14warning2', amtsysstate['CIM_ServiceAvailableToElement'].responses[0]['PowerState'] != 2);
     }
