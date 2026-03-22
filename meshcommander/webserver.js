@@ -19,7 +19,7 @@ module.exports.CreateWebServer = function (args) {
     obj.expressWs = require('express-ws')(obj.app);
     obj.interceptor = require('./interceptor');
     obj.common = require('./common.js');
-    obj.constants = require('constants');
+    obj.constants = require('crypto').constants || require('constants');
     obj.computerlist = null;
 
     obj.debug = function (msg) { if (args.debug) { console.log(msg); } }
@@ -32,15 +32,15 @@ module.exports.CreateWebServer = function (args) {
     
     // Indicates to ExpressJS that the public folder should be used to serve static files. Mesh Commander will be at "default.htm".
     obj.app.use(obj.express.static(obj.path.join(__dirname, 'public')));
-    
+
     // Redirect "/" to the Mesh Commander web application.
     obj.app.get('/', function (req, res) {
         res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' });
         res.redirect('/default.htm');
     });
     
-    // Computer list config file path
-    obj.configPath = obj.path.join(__dirname, 'computerlist.config');
+    // Computer list config file path - use external path if provided (for Electron/asar), fallback to local
+    obj.configPath = args.configPath || obj.path.join(__dirname, 'computerlist.config');
 
     // Get computer list
     obj.app.get('/webrelay.ashx', function (req, res) {
@@ -50,7 +50,7 @@ module.exports.CreateWebServer = function (args) {
                 var list = [];
                 if (err == null) { try { list = JSON.parse(data); } catch (e) { list = []; } }
                 obj.computerlist = obj.common.Clone(list);
-                for (var i in list) { delete list[i].pass; }
+                // Send full list including passwords (local-only app, no security risk)
                 res.set({ 'Content-Type': 'application/json' });
                 res.send(JSON.stringify(list));
             });
@@ -65,6 +65,20 @@ module.exports.CreateWebServer = function (args) {
         if (req.query.action == 'savecomputerlist') {
             var list = req.body;
             if (!Array.isArray(list)) { res.status(400).send('Invalid data'); return; }
+            // Merge passwords: client doesn't have them (stripped on GET), so preserve existing ones
+            if (obj.computerlist) {
+                var passMap = {};
+                for (var i in obj.computerlist) {
+                    var c = obj.computerlist[i];
+                    if (c.host && c.pass) { passMap[c.host] = { user: c.user, pass: c.pass }; }
+                }
+                for (var i in list) {
+                    if (!list[i].pass && list[i].host && passMap[list[i].host]) {
+                        list[i].pass = passMap[list[i].host].pass;
+                        if (!list[i].user || list[i].user === '') { list[i].user = passMap[list[i].host].user; }
+                    }
+                }
+            }
             obj.computerlist = obj.common.Clone(list);
             obj.fs.writeFile(obj.configPath, JSON.stringify(list, null, 2), 'utf8', function (err) {
                 if (err) { res.status(500).send('Failed to save'); return; }
@@ -77,26 +91,41 @@ module.exports.CreateWebServer = function (args) {
     
     // Indicates to ExpressJS what we want to handle websocket requests on "/webrelay.ashx". This is the same URL as IIS making things simple, we can use the same web application for both IIS and Node.
     obj.app.ws('/webrelay.ashx', function (ws, req) {
-        ws.pause();
+        ws._req = req;
+        ws._tcpReady = false;
+        ws._msgBuffer = [];
 
         // When data is received from the web socket, forward the data into the associated TCP connection.
         // If the TCP connection is pending, buffer up the data until it connects.
         ws.on('message', function (msg) {
-            // Convert a buffer into a string, "msg = msg.toString('ascii');" does not work
+            // Convert a buffer into a string
             var msg2 = "";
             for (var i = 0; i < msg.length; i++) { msg2 += String.fromCharCode(msg[i]); }
             msg = msg2;
-            
+
             if (ws.interceptor) { msg = ws.interceptor.processBrowserData(msg); } // Run data thru interceptor
-            ws.forwardclient.write(Buffer.from(msg, 'ascii')); // Forward data to the associated TCP connection.
+            if (ws._tcpReady) {
+                ws.forwardclient.write(Buffer.from(msg, 'ascii'));
+            } else {
+                ws._msgBuffer.push(msg); // Buffer until TCP is connected
+            }
         });
-        
+
         // If the web socket is closed, close the associated TCP connection.
-        ws.on('close', function (req) {
-            obj.debug("Closing web socket connection to " + ws.upgradeReq.query.host + ':' + ws.upgradeReq.query.port + '.');
+        ws.on('close', function () {
+            obj.debug("Closing web socket connection to " + req.query.host + ':' + req.query.port + '.');
             if (ws.forwardclient) { try { ws.forwardclient.destroy(); } catch (e) { } }
         });
-        
+
+        // Flush buffered messages when TCP connects
+        function flushBuffer() {
+            ws._tcpReady = true;
+            for (var i = 0; i < ws._msgBuffer.length; i++) {
+                ws.forwardclient.write(Buffer.from(ws._msgBuffer[i], 'ascii'));
+            }
+            ws._msgBuffer = [];
+        }
+
         // We got a new web socket connection, initiate a TCP connection to the target Intel AMT host/port.
         obj.debug("Opening web socket connection to " + req.query.host + ':' + req.query.port + '.');
         if (req.query.tls == 0) {
@@ -106,11 +135,10 @@ module.exports.CreateWebServer = function (args) {
             ws.forwardclient.forwardwsocket = ws;
         } else {
             // If TLS is going to be used, setup a TLS socket
-            var tlsoptions = { secureProtocol: ((req.query.tls1only == 1) ? 'TLSv1_method' : 'SSLv23_method'), ciphers: 'RSA+AES:!aNULL:!MD5:!DSS', secureOptions: obj.constants.SSL_OP_NO_SSLv2 | obj.constants.SSL_OP_NO_SSLv3 | obj.constants.SSL_OP_NO_COMPRESSION | obj.constants.SSL_OP_CIPHER_SERVER_PREFERENCE, rejectUnauthorized: false };
+            var tlsoptions = { minVersion: 'TLSv1', maxVersion: (req.query.tls1only == 1) ? 'TLSv1' : undefined, ciphers: 'RSA+AES:!aNULL:!MD5:!DSS', secureOptions: obj.constants.SSL_OP_NO_SSLv2 | obj.constants.SSL_OP_NO_SSLv3 | obj.constants.SSL_OP_NO_COMPRESSION | obj.constants.SSL_OP_CIPHER_SERVER_PREFERENCE, rejectUnauthorized: false };
             ws.forwardclient = obj.tls.connect(req.query.port, req.query.host, tlsoptions, function () {
-                // The TLS connection method is the same as TCP, but located a bit differently.
                 obj.debug("TLS connected to " + req.query.host + ':' + req.query.port + '.');
-                ws.resume();
+                flushBuffer();
             });
             ws.forwardclient.setEncoding('binary');
             ws.forwardclient.forwardwsocket = ws;
@@ -145,7 +173,7 @@ module.exports.CreateWebServer = function (args) {
             // A TCP connection to Intel AMT just connected, send any pending data and start forwarding.
             ws.forwardclient.connect(req.query.port, req.query.host, function () {
                 obj.debug("TCP connected to " + req.query.host + ':' + req.query.port + '.');
-                ws.resume();
+                flushBuffer();
             });
         }
     });

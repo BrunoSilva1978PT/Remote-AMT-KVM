@@ -25,8 +25,7 @@
       "main.js",
       "meshcommander/**/*",
       "node_modules/**/*"
-    ],
-    "extraResources": []
+    ]
   },
   "dependencies": {
     "express": "^4.18.2",

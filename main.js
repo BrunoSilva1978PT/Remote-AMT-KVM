@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, session, ipcMain } = require('electron');
 const path = require('path');
 const net = require('net');
 
@@ -18,7 +18,9 @@ function findFreePort() {
 
 function startMeshCommander(port) {
     const webserver = require('./meshcommander/webserver.js');
-    webserver.CreateWebServer({ port: port });
+    // Use userData path for writable config (asar is read-only)
+    const configDir = app.getPath('userData');
+    webserver.CreateWebServer({ port: port, configPath: path.join(configDir, 'computerlist.config') });
 }
 
 function createWindow() {
@@ -36,12 +38,23 @@ function createWindow() {
     });
 
     mainWindow.setMenuBarVisibility(false);
+
+    // Grant clipboard permissions for KVM copy/paste
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+        callback(true);
+    });
+    session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+        if (permission === 'clipboard-read' || permission === 'clipboard-sanitized-write') return true;
+        return true;
+    });
+
     mainWindow.loadURL('http://127.0.0.1:' + serverPort);
 
     mainWindow.on('closed', () => {
         mainWindow = null;
     });
 }
+
 
 app.on('ready', async () => {
     serverPort = await findFreePort();
@@ -53,3 +66,4 @@ app.on('ready', async () => {
 app.on('window-all-closed', () => {
     app.quit();
 });
+
