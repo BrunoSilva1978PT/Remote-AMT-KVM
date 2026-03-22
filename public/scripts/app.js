@@ -671,42 +671,7 @@ function changeConsentDisplay() { }
 // ========== PASTE, COPY (VGA FONT OCR), AND KEYBOARD MAPPING ==========
 
 // Paste dialog - opens a textarea where user can Ctrl+V paste text, then send to remote
-function showPasteDialog() {
-    if (desktop.State != 3) return;
-    var dlg = document.createElement('div');
-    dlg.id = 'kvmPasteDialog';
-    var taH = Math.max(200, Math.floor(window.innerHeight * 0.5));
-    dlg.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center';
-    dlg.innerHTML = '<div style="background:var(--dialog-bg);border:1px solid var(--border);border-radius:8px;padding:24px;width:60vw;min-width:500px;max-width:90vw;box-shadow:0 4px 20px rgba(0,0,0,0.5)">' +
-        '<div style="font-size:16px;font-weight:bold;margin-bottom:12px;color:var(--text)">Paste Text to Remote</div>' +
-        '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Paste your text here (Ctrl+V), then click Send. Text will be typed as keystrokes on the remote machine.</div>' +
-        '<textarea id="kvmPasteText" style="width:100%;height:' + taH + 'px;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);border-radius:4px;padding:8px;font-family:monospace;font-size:13px;resize:vertical;box-sizing:border-box" placeholder="Paste text here..."></textarea>' +
-        '<div style="margin-top:12px;text-align:right">' +
-        '<input type="button" value="Cancel" onclick="closePasteDialog()" style="margin-right:8px">' +
-        '<input type="button" value="Send" onclick="sendPasteText()">' +
-        '</div></div>';
-    document.body.appendChild(dlg);
-    // Try to auto-paste from clipboard
-    var ta = document.getElementById('kvmPasteText');
-    ta.focus();
-    if (navigator.clipboard && navigator.clipboard.readText) {
-        navigator.clipboard.readText().then(function(t) { if (t && ta.value === '') ta.value = t; }).catch(function(){});
-    }
-    // Allow Enter in textarea, Escape to close
-    dlg.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') { closePasteDialog(); e.preventDefault(); }
-        e.stopPropagation(); // Prevent KVM from capturing keystrokes
-    });
-}
-function closePasteDialog() {
-    var dlg = document.getElementById('kvmPasteDialog');
-    if (dlg) dlg.remove();
-}
-function sendPasteText() {
-    var ta = document.getElementById('kvmPasteText');
-    if (ta && ta.value.length > 0) { kvmTypeText(ta.value); }
-    closePasteDialog();
-}
+// showPasteDialog, closePasteDialog, sendPasteText defined in kvm.js
 
 // Paste keyboard mapping: char → [keysym, shift, altgr]
 // Auto-detected layout via getLayoutMap() + hardcoded shift/altgr pairs
@@ -978,22 +943,4 @@ function ocrMouseUp(e) {
         messagebox('Copy', 'No text found in selection');
     }
 }
-function showOcrResult(text, copied) {
-    cancelOcrSelection();
-    // Show result dialog
-    var dlg = document.createElement('div');
-    dlg.id = 'ocrResultDialog';
-    var taH = Math.max(200, Math.floor(window.innerHeight * 0.5));
-    dlg.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center';
-    dlg.innerHTML = '<div style="background:var(--dialog-bg);border:1px solid var(--border);border-radius:8px;padding:24px;width:60vw;min-width:500px;max-width:90vw;box-shadow:0 4px 20px rgba(0,0,0,0.5)">' +
-        '<div style="font-size:16px;font-weight:bold;margin-bottom:8px;color:var(--text)">Extracted Text' + (copied ? ' (copied to clipboard)' : '') + '</div>' +
-        '<textarea id="ocrResultText" style="width:100%;height:' + taH + 'px;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);border-radius:4px;padding:8px;font-family:monospace;font-size:13px;resize:vertical;box-sizing:border-box">' + text.replace(/</g,'&lt;') + '</textarea>' +
-        '<div style="margin-top:8px;font-size:11px;color:var(--text-secondary)">You can edit the text before copying</div>' +
-        '<div style="margin-top:8px;text-align:right">' +
-        '<input type="button" value="Copy" onclick="var t=Q(\'ocrResultText\');t.select();document.execCommand(\'copy\');navigator.clipboard.writeText(t.value)"  style="margin-right:8px">' +
-        '<input type="button" value="Close" onclick="Q(\'ocrResultDialog\').remove()">' +
-        '</div></div>';
-    document.body.appendChild(dlg);
-    dlg.setAttribute('tabindex', '-1'); dlg.focus();
-    dlg.addEventListener('keydown', function(e) { if (e.key === 'Escape') dlg.remove(); e.stopPropagation(); });
-}
+// showOcrResult defined in kvm.js
