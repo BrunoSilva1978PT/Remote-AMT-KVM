@@ -455,6 +455,7 @@ function onIderFileSelected(e) {
 
     // Connect IDER to the AMT device using same credentials as KVM
     if (ider.State == 0) {
+        var ports = portsFromHost(currentcomputer['host'], currentcomputer['tls']);
         ider.Start(ports.host, ports.redir, amtstack.wsman.comm.user, amtstack.wsman.comm.pass, currentcomputer['tls']);
     }
 }

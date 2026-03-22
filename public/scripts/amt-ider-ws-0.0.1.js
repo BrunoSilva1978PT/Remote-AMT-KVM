@@ -76,8 +76,8 @@ var CreateAmtRemoteIder = function () {
         // Send first command, OPEN_SESSION
         obj.SendCommand(0x40, ShortToStrX(obj.rx_timeout) + ShortToStrX(obj.tx_timeout) + ShortToStrX(obj.heartbeat) + IntToStrX(obj.version));
 
-        // Setup the ping timer
-        //obj.pingTimer = setInterval(function () { obj.SendCommand(0x44); }, 5000);
+        // Setup the ping timer to keep session alive
+        obj.pingTimer = setInterval(function () { obj.SendCommand(0x44); }, 5000);
     }
 
     obj.Stop = function () {
