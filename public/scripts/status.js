@@ -237,16 +237,7 @@ function showPowerActionDlg() {
 }
 
 function powerActionDlgCheck() {
-    var action = parseInt(d5actionSelect.value);
-    if ((action == 500) || (action == 501)) {
-        amtstack.RequestOSPowerStateChange((action == 501)?3:2, function (stack, name, response, status) {
-            if (status == 200) { QH('id_dialogMessage', "Power action completed."); } else { QH('id_dialogMessage', format("Power action error #{0}.", status)); }
-            setDialogMode(1, "Power Action", 0);
-            setTimeout(function () { setDialogMode(0); }, 1300);
-        });
-    } else {
-        powerActionDlg();
-    }
+    powerActionDlg();
 }
 
 function powerActionDlg() {
