@@ -222,10 +222,10 @@ function showPasteDialog() {
     var dlg = document.createElement('div');
     dlg.id = 'kvmPasteDialog';
     dlg.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center';
-    dlg.innerHTML = '<div style="background:var(--dialog-bg);border:1px solid var(--border);border-radius:8px;padding:24px;width:700px;max-width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.5)">' +
+    dlg.innerHTML = '<div style="background:var(--dialog-bg);border:1px solid var(--border);border-radius:8px;padding:24px;width:60vw;min-width:500px;max-width:90vw;box-shadow:0 4px 20px rgba(0,0,0,0.5)">' +
         '<div style="font-size:16px;font-weight:bold;margin-bottom:12px;color:var(--text)">Paste Text to Remote</div>' +
         '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Paste your text here (Ctrl+V), then click Send.</div>' +
-        '<textarea id="kvmPasteText" style="width:100%;height:300px;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);border-radius:4px;padding:8px;font-family:monospace;font-size:13px;resize:vertical;box-sizing:border-box" placeholder="Paste text here..."></textarea>' +
+        '<textarea id="kvmPasteText" style="width:100%;height:50vh;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);border-radius:4px;padding:8px;font-family:monospace;font-size:13px;resize:vertical;box-sizing:border-box" placeholder="Paste text here..."></textarea>' +
         '<div style="margin-top:12px;text-align:right"><input type="button" value="Cancel" onclick="closePasteDialog()" style="margin-right:8px"><input type="button" value="Send" onclick="sendPasteText()"></div></div>';
     document.body.appendChild(dlg);
     var ta = document.getElementById('kvmPasteText'); ta.focus();
@@ -428,9 +428,9 @@ function showOcrResult(text, copied) {
     cancelOcrSelection();
     var dlg = document.createElement('div'); dlg.id = 'ocrResultDialog';
     dlg.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center';
-    dlg.innerHTML = '<div style="background:var(--dialog-bg);border:1px solid var(--border);border-radius:8px;padding:24px;width:700px;max-width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.5)">' +
+    dlg.innerHTML = '<div style="background:var(--dialog-bg);border:1px solid var(--border);border-radius:8px;padding:24px;width:60vw;min-width:500px;max-width:90vw;box-shadow:0 4px 20px rgba(0,0,0,0.5)">' +
         '<div style="font-size:16px;font-weight:bold;margin-bottom:8px;color:var(--text)">Extracted Text' + (copied ? ' (copied)' : '') + '</div>' +
-        '<textarea id="ocrResultText" style="width:100%;height:350px;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);border-radius:4px;padding:8px;font-family:monospace;font-size:13px;resize:vertical;box-sizing:border-box">' + text.replace(/</g,'&lt;') + '</textarea>' +
+        '<textarea id="ocrResultText" style="width:100%;height:50vh;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);border-radius:4px;padding:8px;font-family:monospace;font-size:13px;resize:vertical;box-sizing:border-box">' + text.replace(/</g,'&lt;') + '</textarea>' +
         '<div style="margin-top:8px;text-align:right"><input type="button" value="Copy" onclick="var t=Q(\'ocrResultText\');t.select();navigator.clipboard.writeText(t.value)" style="margin-right:8px"><input type="button" value="Close" onclick="Q(\'ocrResultDialog\').remove()"></div></div>';
     document.body.appendChild(dlg);
     dlg.setAttribute('tabindex', '-1'); dlg.focus();
