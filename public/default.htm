@@ -164,7 +164,9 @@ th:hover { cursor: pointer; background: var(--hover); }
         <div style="position:fixed;top:44px;left:0;right:0;height:36px;background-color:var(--bg-alt);border-bottom:1px solid var(--border);padding:0px;display:flex;align-items:center;justify-content:space-between">
             <div style="padding:4px 8px"><input id="computerFilter" type="text" placeholder="Search computers..." style="width:220px" onfocus="onFilterFocus(true)" onblur="onFilterFocus(false)" oninput="computerFilterFunc()"></div>
             <div style="padding:4px 8px;display:flex;gap:4px">
+                <input type="button" value="Scan" onclick="scanNetwork()" title="Scan local network for AMT devices">
                 <input type="button" value="Add..." onclick="addComputer()">
+                <input type="button" value="Delete" onclick="deleteComputers()" title="Delete selected computers">
                 <input type="button" value="Open..." onclick="openComputerList()">
                 <input id="saveComputersButton" type="button" value="Save..." onclick="saveComputerList()" disabled>
             </div>
@@ -291,7 +293,7 @@ th:hover { cursor: pointer; background: var(--hover); }
                 <div style='height:26px'><select id="d4security" style="float:right;width:200px" onchange="updateComputerDialog()"><option value="0">Digest / None<option value="1" selected>Digest / TLS</select><div>Auth / Security</div></div>
                 <div id="d4digest">
                     <div style='height:26px'><input id="d4username" value="admin" style="float:right;width:200px" onkeyup="updateComputerDialog()"><div>Username</div></div>
-                    <div style='height:26px'><input id="d4password" type="password" autocomplete="off" style="float:right;width:200px" onkeyup="updateComputerDialog()"><div>Password*</div></div>
+                    <div style='height:26px'><div style="float:right;position:relative;width:200px"><input id="d4password" type="password" autocomplete="off" style="width:100%;padding-right:28px;box-sizing:border-box" onkeyup="updateComputerDialog()"><span style="position:absolute;right:4px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:14px;user-select:none;opacity:0.6" onclick="var p=Q('d4password');p.type=p.type==='password'?'text':'password';this.textContent=p.type==='password'?'\u{1F441}':'\u{1F441}\u200D\u{1F5E8}'" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">&#x1F441;</span></div><div>Password*</div></div>
                     <div style="font-size:10px"><br>*Minimum 8 characters with upper, lowercase, 0-9, and one of !@#$%^&amp;*()+-</div>
                 </div>
                 <div id="d4kerb" style="display:none">
@@ -331,7 +333,7 @@ th:hover { cursor: pointer; background: var(--hover); }
             </div>
             <div id="dialog8" style="display:table;margin:3px">
                 <div style="margin:3px 0;padding-top:5px"><input id="idx_d8username" value="admin" style="float:right;width:220px"><div style="height:20px">Username</div></div>
-                <div style="margin:3px 0"><input id="idx_d8password" type="password" autocomplete="off" style="float:right;width:220px"><div style="height:20px">Password</div></div>
+                <div style="margin:3px 0"><div style="float:right;position:relative;width:220px"><input id="idx_d8password" type="password" autocomplete="off" style="width:100%;padding-right:28px;box-sizing:border-box"><span style="position:absolute;right:4px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:14px;user-select:none;opacity:0.6" onclick="var p=Q('idx_d8password');p.type=p.type==='password'?'text':'password';this.textContent=p.type==='password'?'\u{1F441}':'\u{1F441}\u200D\u{1F5E8}'" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">&#x1F441;</span></div><div style="height:20px">Password</div></div>
             </div>
             <div id="dialog9" style="margin:auto;margin:3px">
                 <label style="display:block"><input type="checkbox" id='idx_d9redir'>Redirection Port</label>

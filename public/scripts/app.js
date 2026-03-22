@@ -42,6 +42,7 @@ var connectFunc = null;
 var connectFuncTag = null;
 var computerlist = [];
 var currentcomputer = null;
+var editingComputerH = null;
 var computersRunningScripts = 0;
 var fullscreen = false;
 var fullscreenonly = false;
@@ -250,6 +251,7 @@ function computerFilterFunc() {
 
 function addComputer() {
     if (xxdialogMode) return;
+    editingComputerH = null;
     var groups = [], x = '';
     for (var y in computerlist) { var computer = computerlist[y]; if ((computer.tags != null) && (computer.tags != '') && (groups.indexOf(computer.tags) == -1) && (computer.tags.indexOf('"') == -1)) { groups.push(computer.tags); } }
     groups.sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
@@ -270,24 +272,90 @@ function addComputerButton() {
     updateComputerList();
 }
 
+function scanNetwork() {
+    if (xxdialogMode) return;
+    setDialogMode(1, 'Scan Network', 0);
+    QH('id_dialogMessage', '<div style="text-align:center;padding:20px"><div>Scanning local network for AMT devices...</div><div style="margin-top:10px;font-size:12px;color:var(--text-secondary)">Checking ports 16992/16993</div></div>');
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/amt-scan.ashx', true);
+    xhr.onload = function () {
+        try {
+            var result = JSON.parse(xhr.responseText);
+            var devices = result.devices || [];
+            if (devices.length === 0) {
+                QH('id_dialogMessage', '<div style="text-align:center;padding:20px">No AMT devices found on the local network.</div>');
+                setDialogMode(1, 'Scan Network', 1);
+                return;
+            }
+            var html = '<div style="padding:5px"><div style="margin-bottom:8px;font-weight:600">' + devices.length + ' AMT device(s) found:</div>';
+            html += '<div style="max-height:300px;overflow-y:auto">';
+            for (var i = 0; i < devices.length; i++) {
+                var d = devices[i];
+                var exists = false;
+                for (var j in computerlist) { if (decodeURIComponent(computerlist[j].host || '').split(':')[0] === d.ip) { exists = true; break; } }
+                html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 6px;border-bottom:1px solid var(--border)">';
+                html += '<span>' + d.ip + ':' + d.port + (d.tls ? ' (TLS)' : '') + '</span>';
+                if (exists) {
+                    html += '<span style="font-size:11px;color:var(--text-secondary)">Already added</span>';
+                } else {
+                    html += '<input type="button" value="Add" onclick="scanAddComputer(\'' + d.ip + '\',' + d.port + ',' + d.tls + ');this.disabled=true;this.value=\'Added\'">';
+                }
+                html += '</div>';
+            }
+            html += '</div></div>';
+            QH('id_dialogMessage', html);
+            setDialogMode(1, 'Scan Network', 1);
+        } catch (e) {
+            QH('id_dialogMessage', '<div style="text-align:center;padding:20px;color:red">Error parsing scan results.</div>');
+            setDialogMode(1, 'Scan Network', 1);
+        }
+    };
+    xhr.onerror = function () {
+        QH('id_dialogMessage', '<div style="text-align:center;padding:20px;color:red">Network scan failed.</div>');
+        setDialogMode(1, 'Scan Network', 1);
+    };
+    xhr.send();
+}
+
+function scanAddComputer(ip, port, tls) {
+    var host = (port === 16992 || port === 16993) ? ip : ip + ':' + port;
+    computerlist.push({ 'h': Math.random(), 'name': encodeURIComponent(ip), 'host': encodeURIComponent(host), 'tags': encodeURIComponent('Scanned'), 'user': encodeURIComponent('admin'), 'pass': '', 'tls': tls });
+    saveComputers();
+    updateComputerList();
+}
+
 function updateComputerDialog() {
     var k = Q('d4security').value >= 2;
     QV('d4digest', !k); QV('d4kerb', k);
     var hostSplit = d4hostname.value.split(':');
     var hostnameok = (d4hostname.value.length > 0) && (hostSplit.length < 3);
     if (hostnameok && (hostSplit.length == 2)) { var hostport = parseInt(hostSplit[1]); hostnameok = (hostport > 0) && (hostport < 65536) && (hostport == hostSplit[1]); }
+    // Check for duplicate name
+    var nameVal = d4name.value.trim();
+    var nameDup = false;
+    if (nameVal.length > 0) {
+        for (var i in computerlist) {
+            var existingName = decodeURIComponent(computerlist[i].name || '');
+            if (existingName.toLowerCase() === nameVal.toLowerCase()) {
+                if (editingComputerH != null && computerlist[i].h == editingComputerH) continue;
+                nameDup = true; break;
+            }
+        }
+    }
+    QS('d4name')['background-color'] = (nameDup ? 'var(--input-warn, LightYellow)' : 'var(--input-bg)');
     QS('d4hostname')['background-color'] = (hostnameok ? 'var(--input-bg)' : 'var(--input-warn, LightYellow)');
     if (k && hostnameok) {
-        QE('idx_dlgOkButton', d4hostname.value.length > 0);
+        QE('idx_dlgOkButton', d4hostname.value.length > 0 && !nameDup);
     } else {
         QS('d4username')['background-color'] = (((d4username.value.length > 0) && (d4username.value != '*')) ? 'var(--input-bg)' : 'var(--input-warn, LightYellow)');
         QS('d4password')['background-color'] = (((d4username.value == '$$OsAdmin') || passwordcheck(d4password.value) || d4password.value == '') ? 'var(--input-bg)' : 'var(--input-warn, LightYellow)');
-        QE('idx_dlgOkButton', d4hostname.value.length > 0 && d4username.value.length > 0 && d4username.value != '*' && ((d4username.value == '$$OsAdmin') || passwordcheck(d4password.value) || d4password.value == ''));
+        QE('idx_dlgOkButton', d4hostname.value.length > 0 && d4username.value.length > 0 && d4username.value != '*' && ((d4username.value == '$$OsAdmin') || passwordcheck(d4password.value) || d4password.value == '') && !nameDup);
     }
 }
 
 function computerEdit(h) {
     if (xxdialogMode) return;
+    editingComputerH = h;
     var c = null;
     for (x = 0; x < computerlist.length; x++) { if (computerlist[x]['h'] == h) { c = computerlist[x]; } }
     var groups = [], x = '';

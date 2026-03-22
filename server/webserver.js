@@ -109,6 +109,58 @@ module.exports.CreateWebServer = function (args) {
         try { res.end(); } catch (e) { }
     });
     
+    // Scan local network for AMT devices (ports 16992/16993)
+    obj.app.get('/amt-scan.ashx', function (req, res) {
+        res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0', 'Content-Type': 'application/json' });
+        var os = require('os');
+        var interfaces = os.networkInterfaces();
+        var subnets = [];
+        for (var name in interfaces) {
+            for (var i in interfaces[name]) {
+                var iface = interfaces[name][i];
+                if (iface.family === 'IPv4' && !iface.internal && iface.cidr) {
+                    var parts = iface.address.split('.');
+                    subnets.push(parts[0] + '.' + parts[1] + '.' + parts[2]);
+                }
+            }
+        }
+        if (subnets.length === 0) { res.send(JSON.stringify({ devices: [], error: 'No network interfaces found' })); return; }
+
+        var found = [];
+        var pending = 0;
+        var timeout = parseInt(req.query.timeout) || 800;
+        var ports = [16992, 16993];
+
+        function scanHost(subnet, host) {
+            var ip = subnet + '.' + host;
+            for (var p = 0; p < ports.length; p++) {
+                (function (ip, port) {
+                    pending++;
+                    var sock = new obj.net.Socket();
+                    sock.setTimeout(timeout);
+                    sock.on('connect', function () {
+                        if (!found.some(function (d) { return d.ip === ip; })) {
+                            found.push({ ip: ip, port: port, tls: port === 16993 ? 1 : 0 });
+                        }
+                        sock.destroy();
+                    });
+                    sock.on('timeout', function () { sock.destroy(); });
+                    sock.on('error', function () { });
+                    sock.on('close', function () {
+                        pending--;
+                        if (pending === 0) { res.send(JSON.stringify({ devices: found })); }
+                    });
+                    sock.connect(port, ip);
+                })(ip, ports[p]);
+            }
+        }
+
+        // Scan each subnet, skip .0 and .255
+        for (var s = 0; s < subnets.length; s++) {
+            for (var h = 1; h < 255; h++) { scanHost(subnets[s], h); }
+        }
+    });
+
     // Indicates to ExpressJS what we want to handle websocket requests on "/webrelay.ashx". This is the same URL as IIS making things simple, we can use the same web application for both IIS and Node.
     obj.app.ws('/webrelay.ashx', function (ws, req) {
         ws._req = req;
