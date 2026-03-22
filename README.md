@@ -5,6 +5,7 @@ Desktop application for remote management of Intel AMT (Active Management Techno
 ## Features
 
 - **Remote Desktop (Hardware KVM)** - View and control remote machines via Intel AMT KVM, with snapshot and session recording
+- **Copy & Paste** - Paste text from host clipboard directly into the remote machine, and copy text from the remote session
 - **Computer Management** - Add, edit and organize multiple AMT devices with stored credentials
 - **Power Actions** - Remote power on/off, reset, and boot options
 - **TLS Support** - Secure connections to AMT devices on port 16993
