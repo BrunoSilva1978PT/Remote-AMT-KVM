@@ -31,7 +31,7 @@ module.exports.CreateWebServer = function (args) {
     }
     
     // Indicates to ExpressJS that the public folder should be used to serve static files. Mesh Commander will be at "default.htm".
-    obj.app.use(obj.express.static(obj.path.join(__dirname, 'public')));
+    obj.app.use(obj.express.static(obj.path.join(__dirname, '..', 'public')));
 
     // Redirect "/" to the Mesh Commander web application.
     obj.app.get('/', function (req, res) {

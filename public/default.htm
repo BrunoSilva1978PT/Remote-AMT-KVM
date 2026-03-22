@@ -212,10 +212,10 @@ th:hover { cursor: pointer; background: var(--hover); }
                     <table cellpadding="0" cellspacing="0" style="width:100%;padding:0;margin-top:0">
                         <tr><td style="padding:4px 6px;background:var(--toolbar-bg);border-bottom:1px solid var(--border)">
                             <div style="float:right;text-align:right">
-                                <span id="id_p14power"></span>&nbsp;
+                                <span style="font-size:12px;opacity:0.7;margin-right:4px">&#x26A1;</span><span id="id_p14power" style="font-size:12px;opacity:0.7;margin-right:8px"></span>
                                 <div class='rb' title="Rotate Left" onclick="drotate(-1)">&olarr;</div>
                                 <div class='rb' title="Rotate Right" onclick="drotate(1)">&orarr;</div>
-                                <input id="idx_deskFullBtn" type="button" title="Toggle full screen mode" onkeypress="return false" onkeydown="return false" value="Full" onclick="deskToggleFull()" style="margin-right:3px">
+                                <input id="idx_deskFullBtn" type="button" title="Toggle full screen mode" onkeypress="return false" onkeydown="return false" value="⛶ Fullscreen" onclick="deskToggleFull()" style="margin-right:3px">
                                 <input id="idx_deskFocusBtn" type="button" title="Toggle focus mode" onkeypress="return false" onkeydown="return false" value="Focus All" onclick="deskToggleFocus()" style="margin-right:3px">
                                 <input type="button" value="Settings..." title="Edit remote desktop settings" onkeypress="return false" onkeydown="return false" onclick="showDesktopSettings()" style="margin-right:3px">
                                 <input type="button" title="Change the power state" onkeypress="return false" onkeydown="return false" value="Power Actions..." onclick="showPowerActionDlg()" style="margin-right:3px">
@@ -302,24 +302,23 @@ th:hover { cursor: pointer; background: var(--hover); }
                 <div style='height:26px'><input id="d6ConsentText" style="float:right;width:200px" maxlength="6" onkeyup="consentChanged()" onkeypress="if (event.keyCode == 13) return dialogclose(1); else return numbersOnly(event)"><div>Consent Code</div></div>
                 <div style='height:26px'><select id="d6Display" onchange="changeConsentDisplay()" style="float:right;width:200px"><option value="0">Primary display<option value="1">Secondary display<option id="d6ThirdDisplay" value="2" style="display:none">Third display</select><div>Consent Display</div></div>
             </div>
-            <div id="dialog7" style="margin:auto;margin:3px">
-                <br>
-                <div style='height:26px'><select id="idx_d7desktopmode" style="float:right;width:200px"></select><div>Image Encoding</div></div>
-                <div id="d7decimationspan" style='height:26px'><select id="d7decimation" style="float:right;width:200px"><option value="0">Don't set<option value="1">Disabled<option value="2">Automatic<option value="3">Enabled</select><div>Downscaling</div></div>
-                <div style="height:110px">
-                    <div style="float:right;border:1px solid var(--input-border);width:200px;height:110px;overflow-y:auto;background-color:var(--input-bg);color:var(--text)">
+            <div id="dialog7" style="margin:8px 3px 3px 3px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div>Image Encoding</div><select id="idx_d7desktopmode" style="width:200px"></select></div>
+                <div id="d7decimationspan" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div>Downscaling</div><select id="d7decimation" style="width:200px"><option value="0">Don't set<option value="1">Disabled<option value="2">Automatic<option value="3">Enabled</select></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+                    <div style="padding-top:4px">Other Settings</div>
+                    <div style="border:1px solid var(--input-border);width:200px;height:110px;overflow-y:auto;background-color:var(--input-bg);color:var(--text);border-radius:var(--radius-sm)">
                         <label><input type="checkbox" id='d7showfocus'>Show Focus Tool</label><br>
                         <label><input type="checkbox" id='d7showcursor'>Show Local Mouse Cursor</label><br>
                         <label><input type="checkbox" id='d7showcad'>Show Ctrl-Alt-Del</label><br>
                         <label><input type="checkbox" id='d7limitFrameRate'>Limit Frame Rate</label><br>
                         <label><input type="checkbox" id='d7noMouseRotate'>Don't Rotate Mouse</label><br>
                     </div>
-                    <div>Other Settings</div>
                 </div>
                 <div id="d7softkvmsettings" style="display:none">
-                    <h4 style="width:100%;border-bottom:1px solid gray">Software KVM</h4>
-                    <div style="margin:3px 0"><select id="d7bitmapquality" style="float:right;width:200px"><option value="50">50%<option value="40">40%<option selected value="30">30%<option value="20">20%<option value="10">10%<option value="5">5%<option value="1">1%</select><div>Quality</div></div>
-                    <div style="margin:3px 0"><select id="d7bitmapscaling" style="float:right;width:200px"><option selected value="1024">100%<option value="896">87.5%<option value="768">75%<option value="640">62.5%<option value="512">50%<option value="384">37.5%<option value="256">25%<option value="128">12.5%</select><div>Scaling</div></div>
+                    <div style="font-weight:600;font-size:10pt;padding:6px 0 8px 0;margin-top:4px;border-top:1px solid var(--border)">Software KVM</div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div>Quality</div><select id="d7bitmapquality" style="width:200px"><option value="50">50%<option value="40">40%<option selected value="30">30%<option value="20">20%<option value="10">10%<option value="5">5%<option value="1">1%</select></div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div>Scaling</div><select id="d7bitmapscaling" style="width:200px"><option selected value="1024">100%<option value="896">87.5%<option value="768">75%<option value="640">62.5%<option value="512">50%<option value="384">37.5%<option value="256">25%<option value="128">12.5%</select></div>
                 </div>
             </div>
             <div id="dialog8" style="display:table;margin:3px">

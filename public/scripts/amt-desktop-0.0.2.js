@@ -667,7 +667,7 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
 
     var convertAmtKeyCodeTable = {
         'Pause': 19,
-        'CapsLock': 20,
+        'CapsLock': 0xffe5,
         'Space': 32,
         'Quote': 39,
         'Minus': 45,

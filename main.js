@@ -17,7 +17,7 @@ function findFreePort() {
 }
 
 function startMeshCommander(port) {
-    const webserver = require('./meshcommander/webserver.js');
+    const webserver = require('./server/webserver.js');
     // Use userData path for writable config (asar is read-only)
     const configDir = app.getPath('userData');
     webserver.CreateWebServer({ port: port, configPath: path.join(configDir, 'computerlist.config'), settingsPath: path.join(configDir, 'settings.json') });

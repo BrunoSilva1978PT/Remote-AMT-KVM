@@ -23,7 +23,8 @@
     },
     "files": [
       "main.js",
-      "meshcommander/**/*",
+      "server/**/*",
+      "public/**/*",
       "node_modules/**/*"
     ]
   },

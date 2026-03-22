@@ -177,10 +177,22 @@ function deskToggleFull(kvmonly) {
     fullscreenonly = kvmonly; fullscreen = !fullscreen;
     QV('id_topheader', !fullscreen); QV('id_leftbar', !fullscreen); QV('id_rdheader', !fullscreen);
     QV('idx_deskFullBtn', !fullscreen); QV('idx_deskFullBtn2', fullscreen);
-    if (fullscreen) { QS('id_mainarea').top = 0; QS('id_mainarea').left = 0; QS('id_mainarea_pad').padding = 0; }
-    else { QS('id_mainarea').top = '69px'; QS('id_mainarea').left = '156px'; QS('id_mainarea_pad').padding = '8px'; }
+    if (fullscreen) {
+        QS('id_mainarea').top = 0; QS('id_mainarea').left = 0; QS('id_mainarea_pad').padding = 0;
+        if (document.documentElement.requestFullscreen) { document.documentElement.requestFullscreen(); }
+        else if (document.documentElement.webkitRequestFullscreen) { document.documentElement.webkitRequestFullscreen(); }
+    } else {
+        QS('id_mainarea').top = '69px'; QS('id_mainarea').left = '156px'; QS('id_mainarea_pad').padding = '8px';
+        if (document.fullscreenElement) { document.exitFullscreen(); }
+        else if (document.webkitFullscreenElement) { document.webkitExitFullscreen(); }
+    }
     center();
 }
+
+// Sync fullscreen state when user presses Escape or F11
+document.addEventListener('fullscreenchange', function () {
+    if (!document.fullscreenElement && fullscreen) { deskToggleFull(); }
+});
 
 function deskToggleFocus() { desktop.m.focusmode = (desktop.m.focusmode + 64) % 192; Q('idx_deskFocusBtn').value = ["All Focus", "Small Focus", "Large Focus"][desktop.m.focusmode / 64]; }
 
