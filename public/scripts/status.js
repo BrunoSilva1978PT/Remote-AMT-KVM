@@ -235,10 +235,13 @@ function showPowerActionDlg() {
     if (powerState & 2) addOption('d5actionSelect', "Power up", 2);
     if (powerState & 1) { addOption('d5actionSelect', "Reset", 10); addOption('d5actionSelect', "Power cycle", 5); addOption('d5actionSelect', "Power down", 8); }
     if ((amtversion > 9) && (powerState & 1)) { addOption('d5actionSelect', "Soft-off", 12); addOption('d5actionSelect', "Soft-reset", 14); }
+    if ((amtversion > 9) && (powerState & 1)) { addOption('d5actionSelect', "Sleep", 4); addOption('d5actionSelect', "Hibernate", 7); }
     if (amtPowerBootCapabilities && amtPowerBootCapabilities['BIOSSetup'] == true) {
         if (powerState & 2) addOption('d5actionSelect', "Power up to BIOS", 100);
         if (powerState & 1) addOption('d5actionSelect', "Reset to BIOS", 101);
     }
+    if (powerState & 1) { addOption('d5actionSelect', "Reset to IDE-R Floppy", 200); addOption('d5actionSelect', "Reset to IDE-R CDROM", 201); }
+    if (powerState & 2) { addOption('d5actionSelect', "Power on to IDE-R Floppy", 202); addOption('d5actionSelect', "Power on to IDE-R CDROM", 203); }
     if (powerState & 1) addOption('d5actionSelect', "Reset to PXE", 400);
     if (powerState & 2) addOption('d5actionSelect', "Power on to PXE", 401);
     setDialogMode(5, "Power Actions", 3, powerActionDlgCheck);
@@ -264,6 +267,21 @@ function powerActionDlg() {
             amtstack.CIM_BootConfigSetting_ChangeBootOrder(null, function () {
                 amtstack.Put('AMT_BootSettingData', { BIOSSetup: true }, function () {
                     amtstack.RequestPowerStateChange((action == 100)?2:10, function (stack, name, response, status) {
+                        if (status == 200) QH('id_dialogMessage', "Power action completed."); else QH('id_dialogMessage', "Power action error.");
+                        setDialogMode(1, "Power Action", 0); setTimeout(function () { setDialogMode(0); }, 1300);
+                    });
+                }, 0, 1);
+            });
+        });
+    } else if (action >= 200 && action <= 203) {
+        // Boot to IDE-R Floppy/CDROM
+        var isFloppy = (action == 200 || action == 202);
+        var isReset = (action == 200 || action == 201);
+        var bootInstanceID = isFloppy ? 'Intel(r) AMT: Force Floppy/LS120 Boot' : 'Intel(r) AMT: Force CD/DVD Boot';
+        amtstack.SetBootConfigRole(1, function () {
+            amtstack.CIM_BootConfigSetting_ChangeBootOrder('<Address xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2004/08/addressing</Address><ReferenceParameters xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing"><ResourceURI xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_BootSourceSetting</ResourceURI><SelectorSet xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"><Selector Name="InstanceID">' + bootInstanceID + '</Selector></SelectorSet></ReferenceParameters>', function () {
+                amtstack.Put('AMT_BootSettingData', { UseIDER: true }, function () {
+                    amtstack.RequestPowerStateChange(isReset ? 10 : 2, function (stack, name, response, status) {
                         if (status == 200) QH('id_dialogMessage', "Power action completed."); else QH('id_dialogMessage', "Power action error.");
                         setDialogMode(1, "Power Action", 0); setTimeout(function () { setDialogMode(0); }, 1300);
                     });
