@@ -320,9 +320,11 @@ module.exports.CreateServerIder = function () {
         // SCSI command handler
         function handleSCSI(dev, cdb, featureRegister, deviceFlags) {
             var lba, len;
+            var scsiCmd = cdb.charCodeAt(0);
+            var media = (dev === 0xA0) ? obj.floppy : obj.cdrom;
+            console.log('IDER-Server: SCSI cmd=0x' + scsiCmd.toString(16) + ' dev=0x' + dev.toString(16) + ' media=' + (media ? (media.dummy ? 'dummy' : 'real:' + media.size) : 'null'));
 
             // Dummy cdrom returns no-medium for everything
-            var media = (dev === 0xA0) ? obj.floppy : obj.cdrom;
             if (!media || media.dummy) {
                 sendCommandEndResponse(1, 0x02, dev, 0x3a, 0x00);
                 return;
