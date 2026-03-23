@@ -197,7 +197,7 @@ module.exports.CreateServerIder = function () {
                     var ncStr = nc.toString();
                     var authurl = '/RedirectionService';
                     var ha1 = crypto.createHash('md5').update(opts.user + ':' + realm + ':' + opts.pass).digest('hex');
-                    var ha2 = crypto.createHash('md5').update(':' + authurl).digest('hex');
+                    var ha2 = crypto.createHash('md5').update('POST:' + authurl).digest('hex');
                     var response = crypto.createHash('md5').update(ha1 + ':' + nonce + ':' + ncStr + ':' + cnonce + ':' + qop + ':' + ha2).digest('hex');
 
                     var totalLen = opts.user.length + realm.length + nonce.length + authurl.length + cnonce.length + ncStr.length + response.length + qop.length + 8;
