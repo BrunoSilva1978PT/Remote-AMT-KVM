@@ -122,7 +122,7 @@ module.exports.CreateServerIder = function () {
         function processData() {
             while (obj.acc.length > 0) {
                 var len = 0;
-                if (obj.authState < 3) {
+                if (obj.authState < 5) {
                     len = processAuth();
                 } else {
                     len = processIderDataWrapper();
@@ -212,7 +212,7 @@ module.exports.CreateServerIder = function () {
                         String.fromCharCode(qop.length) + qop;
                     sendRaw(authBuf);
                 } else if (authType !== 0 && authstatus === 0) { // SUCCESS (real auth, not query)
-                    obj.authState = 3;
+                    obj.authState = 5;
                     var remaining = obj.acc.length - (9 + l);
                     console.log('IDER-Server: Authenticated successfully, remaining acc=' + remaining);
                     if (opts.onStatus) opts.onStatus('authenticated');
