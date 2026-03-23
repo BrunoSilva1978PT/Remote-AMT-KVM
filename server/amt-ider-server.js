@@ -457,24 +457,22 @@ module.exports.CreateServerIder = function () {
             g_len -= len;
             g_lba += len;
 
-            // Synchronous read directly from file - no async FileReader overhead
+            // Async read like MeshCentral - callback fires immediately from OS cache
             var buffer = Buffer.alloc(len);
-            try { fs.readSync(g_media.fd, buffer, 0, len, lba); } catch (e) { /* read error */ }
-            var data = buffer.toString('binary');
-
-            sendDataToHost(g_dev, (g_len === 0), data, featureRegister & 1);
-            if ((g_len > 0) && !g_reset) {
-                // Use setImmediate to avoid blocking the event loop but stay fast
-                setImmediate(function () { sendDiskDataEx(featureRegister); });
-            } else {
-                g_media = null;
-                if (g_reset) { sendCommand(0x47); g_readQueue = []; g_reset = false; }
-                else if (g_readQueue.length > 0) {
-                    var op = g_readQueue.shift();
-                    g_media = op.media; g_dev = op.dev; g_lba = op.lba; g_len = op.len;
-                    sendDiskDataEx(op.fr);
+            fs.read(g_media.fd, buffer, 0, len, lba, function (error, bytesRead, buffer) {
+                sendDataToHostBuf(g_dev, (g_len === 0), buffer, featureRegister & 1);
+                if ((g_len > 0) && !g_reset) {
+                    sendDiskDataEx(featureRegister);
+                } else {
+                    g_media = null;
+                    if (g_reset) { sendCommand(0x47); g_readQueue = []; g_reset = false; }
+                    else if (g_readQueue.length > 0) {
+                        var op = g_readQueue.shift();
+                        g_media = op.media; g_dev = op.dev; g_lba = op.lba; g_len = op.len;
+                        sendDiskDataEx(op.fr);
+                    }
                 }
-            }
+            });
         }
 
         // Protocol send functions
@@ -505,6 +503,35 @@ module.exports.CreateServerIder = function () {
                 sendCommand(0x54, String.fromCharCode(0, (data.length & 0xff), (data.length >> 8), 0, dma ? 0xb4 : 0xb5, 0, 2, 0, (dmalen & 0xff), (dmalen >> 8), device, 0x58, 0x85, 0, 3, 0, 0, 0, device, 0x50, 0, 0, 0, 0, 0, 0) + data, completed, dma);
             } else {
                 sendCommand(0x54, String.fromCharCode(0, (data.length & 0xff), (data.length >> 8), 0, dma ? 0xb4 : 0xb5, 0, 2, 0, (dmalen & 0xff), (dmalen >> 8), device, 0x58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) + data, completed, dma);
+            }
+        }
+
+        // Buffer-native version for disk data - avoids string conversion in hot path
+        function sendDataToHostBuf(device, completed, dataBuf, dma) {
+            var dataLen = dataBuf.length;
+            var dmalen = dma ? 0 : dataLen;
+            var attributes = completed ? 2 : 0;
+            if (dma) attributes += 1;
+            var seq = obj.outSequence++;
+            var header;
+            if (completed) {
+                header = Buffer.from([0x54, 0, 0, attributes,
+                    seq & 0xff, (seq >> 8) & 0xff, (seq >> 16) & 0xff, (seq >> 24) & 0xff,
+                    0, (dataLen & 0xff), (dataLen >> 8) & 0xff, 0,
+                    dma ? 0xb4 : 0xb5, 0, 2, 0,
+                    (dmalen & 0xff), (dmalen >> 8) & 0xff, device, 0x58,
+                    0x85, 0, 3, 0, 0, 0, device, 0x50, 0, 0, 0, 0, 0, 0]);
+            } else {
+                header = Buffer.from([0x54, 0, 0, attributes,
+                    seq & 0xff, (seq >> 8) & 0xff, (seq >> 16) & 0xff, (seq >> 24) & 0xff,
+                    0, (dataLen & 0xff), (dataLen >> 8) & 0xff, 0,
+                    dma ? 0xb4 : 0xb5, 0, 2, 0,
+                    (dmalen & 0xff), (dmalen >> 8) & 0xff, device, 0x58,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+            }
+            if (obj.socket) {
+                obj.socket.write(Buffer.concat([header, dataBuf]));
+                obj.bytesToAmt += header.length + dataLen;
             }
         }
 
