@@ -52,6 +52,11 @@ var CreateAmtRemoteIder = function () {
     var IDE_CD_PowerManagement = String.fromCharCode(0x01, 0x00, 0x03, 0x00);
     var IDE_CD_Timeout = String.fromCharCode(0x01, 0x05, 0x03, 0x00);
 
+    // USB-R mode: generic removable disk mode sense pages (for ISOs > LS-120 mounted on floppy channel)
+    var IDE_ModeSence_UsbDisk_Page_Array = String.fromCharCode(0x00, 0x12, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x08, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+    var IDE_ModeSence_3F_UsbDisk_Array = String.fromCharCode(0x00, 0x1C, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x08, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+    var IDE_ModeSence_UsbDiskError_Recovery_Array = String.fromCharCode(0x00, 0x12, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00);
+
     // 0x01 constant data
     var IDE_ModeSence_FloppyError_Recovery_Array = String.fromCharCode(0x00, 0x12, 0x24, 0x80, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00);
     var IDE_ModeSence_Ls120Error_Recovery_Array = String.fromCharCode(0x00, 0x12, 0x31, 0x80, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00);
@@ -487,10 +492,12 @@ var CreateAmtRemoteIder = function () {
                     if (obj.cdrom != null) { sectorCount = (obj.cdrom.size >> 11); }
                 }
 
+                var isUsbDisk = (dev == 0xA0) && (sectorCount > 0x3C300); // > LS-120 size = USB disk mode (ISO on floppy channel)
                 switch (cdb.charCodeAt(2) & 0x3f) {
-                    case 0x01: if (dev == 0xA0) { r = (sectorCount <= 0xb40)?IDE_ModeSence_FloppyError_Recovery_Array:IDE_ModeSence_Ls120Error_Recovery_Array; } else { r = IDE_ModeSence_CDError_Recovery_Array; } break;
-                    case 0x05: if (dev == 0xA0) { r = (sectorCount <= 0xb40)?IDE_ModeSence_FloppyDisk_Page_Array:IDE_ModeSence_LS120Disk_Page_Array; } break;
-                    case 0x3f: if (dev == 0xA0) { r = (sectorCount <= 0xb40)?IDE_ModeSence_3F_Floppy_Array:IDE_ModeSence_3F_LS120_Array; } else { r = IDE_ModeSence_3F_CD_Array; } break;
+                    case 0x01: if (dev == 0xA0) { r = isUsbDisk ? IDE_ModeSence_UsbDiskError_Recovery_Array : ((sectorCount <= 0xb40)?IDE_ModeSence_FloppyError_Recovery_Array:IDE_ModeSence_Ls120Error_Recovery_Array); } else { r = IDE_ModeSence_CDError_Recovery_Array; } break;
+                    case 0x05: if (dev == 0xA0 && !isUsbDisk) { r = (sectorCount <= 0xb40)?IDE_ModeSence_FloppyDisk_Page_Array:IDE_ModeSence_LS120Disk_Page_Array; } break;
+                    case 0x08: if (isUsbDisk) { r = IDE_ModeSence_UsbDisk_Page_Array; } break;
+                    case 0x3f: if (dev == 0xA0) { r = isUsbDisk ? IDE_ModeSence_3F_UsbDisk_Array : ((sectorCount <= 0xb40)?IDE_ModeSence_3F_Floppy_Array:IDE_ModeSence_3F_LS120_Array); } else { r = IDE_ModeSence_3F_CD_Array; } break;
                     case 0x1A: if (dev == 0xB0) { r = IDE_ModeSence_CD_1A_Array; } break;
                     case 0x1D: if (dev == 0xB0) { r = IDE_ModeSence_CD_1D_Array; } break;
                     case 0x2A: if (dev == 0xB0) { r = IDE_ModeSence_CD_2A_Array; } break;

@@ -456,10 +456,19 @@ function onIderFileSelected(e) {
     if (!file) return;
     e.target.value = ''; // Reset so same file can be re-selected
 
-    // Mount ISO as CD-ROM (0xB0) - same behavior for IDE-R and USB-R
-    // AMT firmware handles the presentation (IDE vs USB) transparently
-    ider.m.cdrom = file;
-    ider.m.floppy = null;
+    // USB-R (AMT v11+): mount ISO on floppy/disk channel (0xA0) for USB 2.0 speed
+    //   - ISO appears as USB disk (sdX) with 512-byte sectors, no CD-ROM speed cap
+    //   - Dummy blob on cdrom channel (0xB0) prevents sr0 kernel I/O errors
+    // IDE-R (AMT <11): mount ISO on cdrom channel (0xB0) as traditional IDE CD-ROM
+    if (currentcomputer && currentcomputer['usbr']) {
+        ider.m.floppy = file;
+        ider.m.cdrom = new Blob([new ArrayBuffer(2048)], { type: 'application/octet-stream' });
+        ider.m.cdrom.name = 'dummy.iso';
+        ider.m.cdrom.size = 2048;
+    } else {
+        ider.m.cdrom = file;
+        ider.m.floppy = null;
+    }
     ider.m.iderStart = 0; // OnReboot - firmware detects device during boot
 
     // Connect IDER to the AMT device using same credentials as KVM
