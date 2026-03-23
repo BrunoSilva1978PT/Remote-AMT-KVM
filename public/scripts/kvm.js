@@ -500,8 +500,11 @@ function updateIderUI() {
     var hasMedia = (ider && ider.m && (ider.m.cdrom || ider.m.floppy));
     QV('iderEjectBtn', connected);
     if (connected && hasMedia) {
-        var name = ider.m.cdrom ? ider.m.cdrom.name : ider.m.floppy.name;
-        var modeLabel = (currentcomputer && currentcomputer['usbr']) ? ' (USB-R)' : ' (IDE-R)';
+        var isUsbR = (currentcomputer && currentcomputer['usbr']);
+        var name = isUsbR ? (ider.m.floppy ? ider.m.floppy.name : '') : (ider.m.cdrom ? ider.m.cdrom.name : '');
+        if (!name && ider.m.floppy) name = ider.m.floppy.name;
+        if (!name && ider.m.cdrom) name = ider.m.cdrom.name;
+        var modeLabel = isUsbR ? ' (USB-R)' : ' (IDE-R)';
         Q('iderStatus').textContent = '💿 ' + name + modeLabel;
         Q('iderMountBtn').value = '💿 Change ISO';
     } else if (ider && ider.State > 0) {

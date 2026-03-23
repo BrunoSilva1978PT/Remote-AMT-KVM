@@ -172,8 +172,9 @@ var CreateAmtRemoteIder = function () {
                 debug(obj.iderinfo);
 
                 if (obj.iderinfo.proto != 0) { debug("Unknown proto", obj.iderinfo.proto); obj.Stop(); }
-                if (obj.iderinfo.readbfr > 8192) { debug("Illegal read buffer size", obj.iderinfo.readbfr); obj.Stop(); }
-                if (obj.iderinfo.writebfr > 8192) { debug("Illegal write buffer size", obj.iderinfo.writebfr); obj.Stop(); }
+                if (obj.iderinfo.readbfr > 65536) { debug("Illegal read buffer size", obj.iderinfo.readbfr); obj.Stop(); }
+                if (obj.iderinfo.writebfr > 65536) { debug("Illegal write buffer size", obj.iderinfo.writebfr); obj.Stop(); }
+                debug("IDER readbfr=" + obj.iderinfo.readbfr + " writebfr=" + obj.iderinfo.writebfr);
 
                 if (obj.iderStart == 0) { obj.SendDisableEnableFeatures(3, IntToStrX(0x01 + 0x08)); } // OnReboot
                 else if (obj.iderStart == 1) { obj.SendDisableEnableFeatures(3, IntToStrX(0x01 + 0x10)); } // Graceful
