@@ -42,6 +42,8 @@ var connectFunc = null;
 var connectFuncTag = null;
 var computerlist = [];
 var currentcomputer = null;
+var rmcpStatus = {};
+var rmcpPollTimer = null;
 var editingComputerH = null;
 var computersRunningScripts = 0;
 var fullscreen = false;
@@ -446,7 +448,15 @@ function updateComputerList() {
         x += ' onclick="computerSelect(event, ' + computer['h'] + ')" id=CI-' + computer['h'] + '>';
         x += '<td id=LCX-' + computer['h'] + ' style="width:3px;background:' + tlsColor + ';border-radius:4px 0 0 4px;float:none">&nbsp;</td>';
         x += '<td style=width:10px;padding-left:6px><input id=SJ-' + computer['h'] + ' type=checkbox onclick=onComputerChecked()' + (computer.checked?' checked':'') + ' /></td>';
-        x += '<td align=left style=padding-left:8px><b style=font-size:14px>' + EscapeHtml(name) + '</b></td>';
+        var rHost = decodeURIComponent(computer['host']).split(':')[0];
+        var rStatus = rmcpStatus[rHost];
+        var rmcpColor = '#555', rmcpTitle = 'Checking...';
+        if (rStatus) {
+            if (rStatus.status === 'online') { rmcpColor = (rStatus.provisioningState === 1) ? '#ffaa00' : '#00d4aa'; rmcpTitle = 'AMT online' + (rStatus.amtVersion ? ' (v' + rStatus.amtVersion + ')' : ''); }
+            else { rmcpColor = '#555'; rmcpTitle = 'AMT offline'; }
+        }
+        x += '<td style="width:12px;padding-left:4px"><div id=RMCP-' + computer['h'] + ' title="' + rmcpTitle + '" style="width:8px;height:8px;border-radius:50%;background:' + rmcpColor + ';display:inline-block;transition:background 0.3s"></div></td>';
+        x += '<td align=left style=padding-left:6px><b style=font-size:14px>' + EscapeHtml(name) + '</b></td>';
         x += '<td align=right style="padding-right:8px;font-size:9pt;color:#8892b0">' + extra.join(', ') + '</td><td style=width:1px;padding-right:6px>' + AddButton2("Connect", 'computerConnect(event,' + computer['h'] + ')') + '</td>';
         x += '<td id=RCX-' + computer['h'] + ' style="width:3px;background:' + tlsColor + ';border-radius:0 4px 4px 0;float:none">&nbsp;</td>';
         x += '</table></div></div>';
@@ -508,6 +518,7 @@ function loadComputers() {
                 if (xhr.status === 200 && xhr.responseText) { try { computerlist = JSON.parse(xhr.responseText); } catch (e) { computerlist = []; } }
                 else { var ctext = null; try { ctext = localStorage.getItem('computers'); } catch (ex) { } if (ctext) { try { computerlist = JSON.parse(ctext); } catch (e) { computerlist = []; } } }
                 updateComputerList();
+                startRmcpPolling();
             }
         };
         xhr.send();
@@ -515,6 +526,52 @@ function loadComputers() {
         var ctext = null; try { ctext = localStorage.getItem('computers'); } catch (ex2) { }
         if (ctext) { try { computerlist = JSON.parse(ctext); } catch (e) { computerlist = []; } }
         updateComputerList();
+        startRmcpPolling();
+    }
+}
+
+function startRmcpPolling() {
+    pollRmcpStatus();
+    if (rmcpPollTimer) clearInterval(rmcpPollTimer);
+    rmcpPollTimer = setInterval(pollRmcpStatus, 30000);
+}
+
+function pollRmcpStatus() {
+    if (computerlist.length === 0) return;
+    var hosts = [];
+    for (var i = 0; i < computerlist.length; i++) {
+        var h = decodeURIComponent(computerlist[i]['host']).split(':')[0];
+        if (h && hosts.indexOf(h) === -1) hosts.push(h);
+    }
+    if (hosts.length === 0) return;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/rmcp-ping.ashx?hosts=' + encodeURIComponent(hosts.join(',')) + '&timeout=2000', true);
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+            try {
+                var arr = JSON.parse(xhr.responseText);
+                for (var i = 0; i < arr.length; i++) { rmcpStatus[arr[i].host] = arr[i]; }
+                updateRmcpIndicators();
+            } catch (e) { }
+        }
+    };
+    xhr.send();
+}
+
+function updateRmcpIndicators() {
+    for (var i = 0; i < computerlist.length; i++) {
+        var computer = computerlist[i];
+        var rHost = decodeURIComponent(computer['host']).split(':')[0];
+        var dotEl = document.getElementById('RMCP-' + computer['h']);
+        if (!dotEl) continue;
+        var rStatus = rmcpStatus[rHost];
+        if (rStatus && rStatus.status === 'online') {
+            dotEl.style.background = (rStatus.provisioningState === 1) ? '#ffaa00' : '#00d4aa';
+            dotEl.title = 'AMT online' + (rStatus.amtVersion ? ' (v' + rStatus.amtVersion + ')' : '');
+        } else {
+            dotEl.style.background = '#555';
+            dotEl.title = 'AMT offline';
+        }
     }
 }
 

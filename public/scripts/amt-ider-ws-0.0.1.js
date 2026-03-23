@@ -72,6 +72,7 @@ var CreateAmtRemoteIder = function () {
         obj.bytesFromAmt = 0;
         obj.inSequence = 0;
         obj.outSequence = 0;
+        clearDiskCache();
 
         // Send first command, OPEN_SESSION
         obj.SendCommand(0x40, ShortToStrX(obj.rx_timeout) + ShortToStrX(obj.tx_timeout) + ShortToStrX(obj.heartbeat) + IntToStrX(obj.version));
@@ -186,6 +187,7 @@ var CreateAmtRemoteIder = function () {
             case 0x46: // RESETOCCURED
                 if (obj.acc.length < 9) return 0;
                 var resetMask = obj.acc.charCodeAt(8);
+                clearDiskCache();
                 if (g_media === null) {
                     // No operations are pending
                     obj.SendCommand(0x47); // Send ResetOccuredResponse
@@ -537,23 +539,111 @@ var CreateAmtRemoteIder = function () {
     var g_dev;
     var g_lba;
     var g_len;
+
+    // Read-ahead cache for optimized disk I/O (USB-R performance)
+    var g_readCache = null;        // { offset, length, data: ArrayBuffer } - current pre-loaded block
+    var g_cacheBlockSize = 4 * 1024 * 1024; // 4MB pre-read blocks
+    var g_lruCache = new Map();    // blockIndex -> { data: ArrayBuffer, size: number }
+    var g_lruMaxSize = 16 * 1024 * 1024; // 16MB max LRU
+    var g_lruCurrentSize = 0;
+
+    function clearDiskCache() {
+        g_readCache = null;
+        g_lruCache = new Map();
+        g_lruCurrentSize = 0;
+    }
+
+    function arrayBufferToBinaryString(buffer, offset, length) {
+        var bytes = new Uint8Array(buffer, offset, length);
+        var str = '';
+        for (var i = 0; i < bytes.length; i += 4096) {
+            str += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + 4096, bytes.length)));
+        }
+        return str;
+    }
+
+    function getCachedData(offset, length) {
+        // Check main read-ahead cache first
+        if (g_readCache && offset >= g_readCache.offset && (offset + length) <= (g_readCache.offset + g_readCache.length)) {
+            return arrayBufferToBinaryString(g_readCache.data, offset - g_readCache.offset, length);
+        }
+        // Check LRU cache
+        var blockIdx = Math.floor(offset / g_cacheBlockSize);
+        var block = g_lruCache.get(blockIdx);
+        if (block) {
+            var blockStart = blockIdx * g_cacheBlockSize;
+            var localOffset = offset - blockStart;
+            if (localOffset >= 0 && (localOffset + length) <= block.size) {
+                // Move to end (most recently used)
+                g_lruCache.delete(blockIdx);
+                g_lruCache.set(blockIdx, block);
+                return arrayBufferToBinaryString(block.data, localOffset, length);
+            }
+        }
+        return null;
+    }
+
+    function lruEvict(neededSize) {
+        while (g_lruCurrentSize + neededSize > g_lruMaxSize && g_lruCache.size > 0) {
+            var oldest = g_lruCache.keys().next().value;
+            var entry = g_lruCache.get(oldest);
+            g_lruCurrentSize -= entry.size;
+            g_lruCache.delete(oldest);
+        }
+    }
+
     function sendDiskDataEx(featureRegister) {
         var len = g_len, lba = g_lba;
         if (g_len > obj.iderinfo.readbfr) { len = obj.iderinfo.readbfr; }
-        g_len -= len;
-        g_lba += len;
-        var fr = new FileReader();
-        fr.onload = function () {
-            obj.SendDataToHost(g_dev, (g_len == 0), this.result, featureRegister & 1);
+
+        // Try to serve from cache
+        var cached = getCachedData(lba, len);
+        if (cached !== null) {
+            g_len -= len;
+            g_lba += len;
+            obj.SendDataToHost(g_dev, (g_len == 0), cached, featureRegister & 1);
             if ((g_len > 0) && (g_reset == false)) {
                 sendDiskDataEx(featureRegister);
             } else {
                 g_media = null;
-                if (g_reset) { obj.SendCommand(0x47); g_reset = false; } // Send ResetOccuredResponse
+                if (g_reset) { obj.SendCommand(0x47); g_reset = false; }
+            }
+            return;
+        }
+
+        // Cache miss: pre-read a large block from file
+        var fileSize = g_media.size;
+        var blockStart = lba;
+        var blockLen = Math.min(g_cacheBlockSize, fileSize - blockStart);
+        if (blockLen <= 0) { blockLen = len; } // Fallback
+
+        var fr = new FileReader();
+        fr.onload = function () {
+            // Store in read-ahead cache
+            g_readCache = { offset: blockStart, length: this.result.byteLength, data: this.result };
+
+            // Also add to LRU cache
+            var blockIdx = Math.floor(blockStart / g_cacheBlockSize);
+            if (!g_lruCache.has(blockIdx)) {
+                lruEvict(this.result.byteLength);
+                g_lruCache.set(blockIdx, { data: this.result, size: this.result.byteLength });
+                g_lruCurrentSize += this.result.byteLength;
+            }
+
+            // Now serve the chunk from the freshly loaded cache
+            g_len -= len;
+            g_lba += len;
+            var data = arrayBufferToBinaryString(this.result, lba - blockStart, len);
+            obj.SendDataToHost(g_dev, (g_len == 0), data, featureRegister & 1);
+            if ((g_len > 0) && (g_reset == false)) {
+                sendDiskDataEx(featureRegister);
+            } else {
+                g_media = null;
+                if (g_reset) { obj.SendCommand(0x47); g_reset = false; }
             }
         };
-        //console.log('Read from ' + lba + ' to ' + (lba + len) + ', total of ' + len);
-        fr.readAsBinaryString(g_media.slice(lba, lba + len));
+        debug('IDER-CacheMiss: preloading ' + blockLen + ' bytes from offset ' + blockStart);
+        fr.readAsArrayBuffer(g_media.slice(blockStart, blockStart + blockLen));
     }
 
     return obj;

@@ -12,6 +12,7 @@ module.exports.CreateWebServer = function (args) {
     obj.fs = require('fs');
     obj.net = require('net');
     obj.tls = require('tls');
+    obj.dgram = require('dgram');
     obj.path = require('path');
     obj.args = args;
     obj.express = require('express');
@@ -159,6 +160,74 @@ module.exports.CreateWebServer = function (args) {
         for (var s = 0; s < subnets.length; s++) {
             for (var h = 1; h < 255; h++) { scanHost(subnets[s], h); }
         }
+    });
+
+    // RMCP Presence Ping - batch ping multiple AMT hosts via UDP 623
+    obj.app.get('/rmcp-ping.ashx', function (req, res) {
+        res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0', 'Content-Type': 'application/json' });
+        var hostsParam = req.query.hosts;
+        if (!hostsParam) { res.status(400).send(JSON.stringify({ error: 'Missing hosts parameter' })); return; }
+        var hosts = hostsParam.split(',').filter(function (h) { return h.trim().length > 0; }).map(function (h) { return h.trim(); });
+        if (hosts.length === 0) { res.send(JSON.stringify([])); return; }
+
+        var pingPacket = Buffer.from([0x06, 0x00, 0xff, 0x06, 0x00, 0x00, 0x11, 0xbe, 0x80, 0x00, 0x00, 0x00]);
+        var timeout = parseInt(req.query.timeout) || 2000;
+        var results = {};
+        for (var i = 0; i < hosts.length; i++) { results[hosts[i]] = { host: hosts[i], status: 'offline' }; }
+
+        var responded = false;
+        var client = obj.dgram.createSocket('udp4');
+
+        var timer = setTimeout(function () {
+            if (!responded) {
+                responded = true;
+                try { client.close(); } catch (e) { }
+                var arr = [];
+                for (var h in results) { arr.push(results[h]); }
+                res.send(JSON.stringify(arr));
+            }
+        }, timeout + 500);
+
+        client.on('error', function () {
+            if (!responded) {
+                responded = true;
+                clearTimeout(timer);
+                try { client.close(); } catch (e) { }
+                var arr = [];
+                for (var h in results) { arr.push(results[h]); }
+                res.send(JSON.stringify(arr));
+            }
+        });
+
+        client.on('message', function (data, rinfo) {
+            if (responded) return;
+            var ip = rinfo.address;
+            if (results[ip] && data.length >= 22) {
+                if (((data[12] === 0) || (data[13] !== 0) || (data[14] !== 1) || (data[15] !== 0x57)) && (data[21] & 32)) {
+                    var minorVersion = data[18] & 0x0F;
+                    var majorVersion = (data[18] >> 4) & 0x0F;
+                    var provisioningState = data[19] & 0x03;
+                    var openPort = (data[16] * 256) + data[17];
+                    var dualPorts = ((data[19] & 0x04) !== 0);
+                    results[ip] = {
+                        host: ip,
+                        status: 'online',
+                        amtVersion: majorVersion + '.' + minorVersion,
+                        provisioningState: provisioningState,
+                        openPort: openPort,
+                        dualPorts: dualPorts
+                    };
+                } else {
+                    results[ip] = { host: ip, status: 'online' };
+                }
+            }
+        });
+
+        client.bind(0, function () {
+            for (var i = 0; i < hosts.length; i++) {
+                try { client.send(pingPacket, 0, 12, 623, hosts[i]); } catch (e) { }
+            }
+        });
     });
 
     // Indicates to ExpressJS what we want to handle websocket requests on "/webrelay.ashx". This is the same URL as IIS making things simple, we can use the same web application for both IIS and Node.

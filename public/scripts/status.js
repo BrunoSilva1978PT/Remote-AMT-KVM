@@ -131,6 +131,7 @@ function updateSystemStatus() {
         }
         x += TableEntry("Intel&reg; ME", 'v' + getItem(amtlogicalelements, 'InstanceID', 'AMT')['VersionString'] + mode);
         currentcomputer['ver'] = getItem(amtlogicalelements, 'InstanceID', 'AMT')['VersionString'];
+        currentcomputer['usbr'] = (parseInt(currentcomputer['ver']) >= 11);
         currentcomputer['date'] = new Date().toISOString();
         saveComputers();
     }
@@ -149,7 +150,7 @@ function updateSystemStatus() {
             QV('go14', true);
             kvm = amtfeatures[3] = ((amtsysstate['CIM_KVMRedirectionSAP'].response['EnabledState'] == 6 && amtsysstate['CIM_KVMRedirectionSAP'].response['RequestedState'] == 2) || amtsysstate['CIM_KVMRedirectionSAP'].response['EnabledState'] == 2 || amtsysstate['CIM_KVMRedirectionSAP'].response['EnabledState'] == 6);
         }
-        if (redir) features += ", Redirection Port"; if (sol) features += ", Serial-over-LAN"; if (ider) features += ", IDE-Redirect"; if (kvm) features += ", KVM";
+        if (redir) features += ", Redirection Port"; if (sol) features += ", Serial-over-LAN"; if (ider) features += (amtversion >= 11) ? ", USB-Redirect" : ", IDE-Redirect"; if (kvm) features += ", KVM";
         if (features == '') features = '  None';
         x += TableEntry("Active Features", addLinkConditional(features.substring(2), 'showFeaturesDlg()', xxAccountAdminName));
     }

@@ -491,7 +491,8 @@ function updateIderUI() {
     QV('iderEjectBtn', connected);
     if (connected && hasMedia) {
         var name = ider.m.cdrom ? ider.m.cdrom.name : ider.m.floppy.name;
-        Q('iderStatus').textContent = '💿 ' + name;
+        var modeLabel = (currentcomputer && currentcomputer['usbr']) ? ' (USB-R)' : ' (IDE-R)';
+        Q('iderStatus').textContent = '💿 ' + name + modeLabel;
         Q('iderMountBtn').value = '💿 Change ISO';
     } else if (ider && ider.State > 0) {
         Q('iderStatus').textContent = 'Connecting...';
