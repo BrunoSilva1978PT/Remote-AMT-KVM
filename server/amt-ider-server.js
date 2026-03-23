@@ -70,16 +70,11 @@ module.exports.CreateServerIder = function () {
         obj.authState = 0;
         obj.opts = opts;
 
-        // Open the ISO file
+        // Open the ISO file - always mount as CD-ROM for server-side IDER
+        // (AMT firmware probes CD-ROM channel first; server-side eliminates browser overhead)
         try {
             var stats = fs.statSync(opts.isoPath);
-            if (opts.mountMode === 'usb') {
-                obj.floppy = { size: stats.size, fd: fs.openSync(opts.isoPath, 'r') };
-                // Dummy cdrom (2048 bytes of zeros)
-                obj.cdrom = { size: 2048, dummy: true };
-            } else {
-                obj.cdrom = { size: stats.size, fd: fs.openSync(opts.isoPath, 'r') };
-            }
+            obj.cdrom = { size: stats.size, fd: fs.openSync(opts.isoPath, 'r') };
         } catch (e) {
             if (opts.onError) opts.onError('Cannot open file: ' + e.message);
             return null;
