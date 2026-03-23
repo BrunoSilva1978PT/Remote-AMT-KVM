@@ -456,11 +456,11 @@ function onIderFileSelected(e) {
     if (!file) return;
     e.target.value = ''; // Reset so same file can be re-selected
 
-    // USB-R (AMT v11+): mount as disk device (0xA0) so it appears as USB drive (sdX)
-    // IDE-R (AMT <11): mount as CD-ROM device (0xB0) so it appears as IDE CD (sr0)
+    // USB-R (AMT v11+): mount on both channels - disk (0xA0) as USB drive + CD-ROM (0xB0) to prevent sr0 errors
+    // IDE-R (AMT <11): mount as CD-ROM device (0xB0) only
     if (currentcomputer && currentcomputer['usbr']) {
         ider.m.floppy = file;
-        ider.m.cdrom = null;
+        ider.m.cdrom = file;
     } else {
         ider.m.cdrom = file;
         ider.m.floppy = null;
