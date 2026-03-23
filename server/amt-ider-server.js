@@ -103,13 +103,12 @@ module.exports.CreateServerIder = function () {
                 obj.socket = tls.connect(port, opts.host, tlsoptions, onConnected);
             }
             obj.socket.on('data', onData);
-            obj.socket.on('close', function () { console.log('IDER-Server: TCP closed'); obj.Stop(); });
-            obj.socket.on('error', function (e) { console.log('IDER-Server: TCP error:', e.code); if (opts.onError) opts.onError('TCP error: ' + e.code); obj.Stop(); });
+            obj.socket.on('close', function () { obj.Stop(); });
+            obj.socket.on('error', function (e) { if (opts.onError) opts.onError('TCP error: ' + e.code); obj.Stop(); });
         }
 
         function onConnected() {
             if (opts.tls != 0 && obj.socket.socket) obj.socket.socket.setNoDelay(true);
-            console.log('IDER-Server: TCP connected to ' + opts.host + ':' + opts.port);
             if (opts.onStatus) opts.onStatus('connected');
             // Send IDER start redirection
             var buf = Buffer.from([0x10, 0x00, 0x00, 0x00, 0x49, 0x44, 0x45, 0x52]);
@@ -135,7 +134,7 @@ module.exports.CreateServerIder = function () {
                     // Check sequence number for ALL IDER messages (bytes 4-7)
                     if (len > 0 && obj.acc.length >= 8) {
                         var seq = ReadIntX(obj.acc, 4);
-                        if (obj.inSequence !== seq) { console.log('IDER: Out of sequence', obj.inSequence, seq); obj.Stop(); return; }
+                        if (obj.inSequence !== seq) { obj.Stop(); return; }
                         obj.inSequence++;
                     }
                 }
@@ -172,7 +171,7 @@ module.exports.CreateServerIder = function () {
                     // Check if digest (4) is available, then send empty digest to trigger challenge
                     var methods = [];
                     for (var mi = 0; mi < l; mi++) { methods.push(obj.acc.charCodeAt(9 + mi)); }
-                    console.log('IDER-Server: Auth methods available:', methods);
+                    // Auth methods available (e.g. [4] = digest)
                     if (methods.indexOf(4) >= 0) {
                         // Send empty digest auth request to trigger challenge (same as client-side)
                         var authurl = '/RedirectionService';
@@ -219,8 +218,6 @@ module.exports.CreateServerIder = function () {
                     sendRaw(authBuf);
                 } else if (authType !== 0 && authstatus === 0) { // SUCCESS (real auth, not query)
                     obj.authState = 5;
-                    var remaining = obj.acc.length - (9 + l);
-                    console.log('IDER-Server: Authenticated successfully, remaining acc=' + remaining);
                     if (opts.onStatus) opts.onStatus('authenticated');
                     startIder();
                 } else {
@@ -241,7 +238,6 @@ module.exports.CreateServerIder = function () {
 
             // Send OPEN_SESSION
             var openCmd = ShortToStrX(obj.rx_timeout) + ShortToStrX(obj.tx_timeout) + ShortToStrX(obj.heartbeat) + IntToStrX(obj.version);
-            console.log('IDER-Server: Sending OPEN_SESSION, data length=' + openCmd.length);
             sendCommand(0x40, openCmd);
 
             // Keepalive ping every 5 seconds
@@ -252,12 +248,7 @@ module.exports.CreateServerIder = function () {
 
         function processIderDataWrapper() {
             if (obj.acc.length < 8) return 0;
-            var cmd = obj.acc.charCodeAt(0);
-            var len = processIderData();
-            if (len > 0) {
-                console.log('IDER-Server: Recv cmd=0x' + cmd.toString(16) + ' len=' + len + ' seq=' + (obj.inSequence - 1));
-            }
-            return len;
+            return processIderData();
         }
 
         // IDER protocol processing (same logic as client-side but with fs.readSync)
@@ -318,7 +309,6 @@ module.exports.CreateServerIder = function () {
                     sendCommand(0x51, String.fromCharCode(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x87, 0x70, 0x03, 0x00, 0x00, 0x00, 0xa0, 0x51, 0x07, 0x27, 0x00), true);
                     return 14 + wlen;
                 default:
-                    console.log('IDER-Server: Unknown command', obj.acc.charCodeAt(0));
                     return 8;
             }
         }
@@ -328,9 +318,7 @@ module.exports.CreateServerIder = function () {
             var lba, len;
             var scsiCmd = cdb.charCodeAt(0);
             var media = (dev === 0xA0) ? obj.floppy : obj.cdrom;
-            console.log('IDER-Server: SCSI cmd=0x' + scsiCmd.toString(16) + ' dev=0x' + dev.toString(16) + ' media=' + (media ? (media.dummy ? 'dummy' : 'real:' + media.size) : 'null'));
-
-            // Dummy cdrom returns no-medium for everything
+            // Dummy media returns no-medium for everything
             if (!media || media.dummy) {
                 sendCommandEndResponse(1, 0x02, dev, 0x3a, 0x00);
                 return;
@@ -493,7 +481,6 @@ module.exports.CreateServerIder = function () {
         function sendRaw(x) {
             if (obj.socket) {
                 var buf = Buffer.from(x, 'binary');
-                console.log('IDER-Server: Send ' + buf.length + ' bytes, cmd=0x' + buf[0].toString(16) + ' hex=' + buf.toString('hex').substring(0, 60));
                 obj.socket.write(buf);
                 obj.bytesToAmt += x.length;
             }

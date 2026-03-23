@@ -503,7 +503,7 @@ function startServerSideIder(filePath, fileName) {
                 iderStatusTimer = setInterval(pollIderStatus, 2000);
             } else {
                 iderServerSide = false;
-                if (xhr.responseText) { try { var r = JSON.parse(xhr.responseText); console.log('Server IDER error:', r.error); } catch(e) {} }
+                if (xhr.responseText) { try { var r = JSON.parse(xhr.responseText); } catch(e) {} }
             }
         }
     };
