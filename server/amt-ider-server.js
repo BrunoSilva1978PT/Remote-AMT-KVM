@@ -169,26 +169,30 @@ module.exports.CreateServerIder = function () {
                     var qoplen = obj.acc.charCodeAt(11 + realmlen + noncelen);
                     var qop = obj.acc.substring(12 + realmlen + noncelen, 12 + realmlen + noncelen + qoplen);
 
-                    // Send digest auth response
+                    // Send digest auth response (match interceptor format exactly)
                     var cnonce = crypto.randomBytes(5).toString('hex');
-                    var nc = '00000002';
+                    var nc = 2;
+                    var ncStr = nc.toString();
+                    var authurl = '/RedirectionService';
                     var ha1 = crypto.createHash('md5').update(opts.user + ':' + realm + ':' + opts.pass).digest('hex');
-                    var ha2 = crypto.createHash('md5').update(':' + '/RedirectionService').digest('hex');
-                    var response = crypto.createHash('md5').update(ha1 + ':' + nonce + ':' + nc + ':' + cnonce + ':' + qop + ':' + ha2).digest('hex');
+                    var ha2 = crypto.createHash('md5').update(':' + authurl).digest('hex');
+                    var response = crypto.createHash('md5').update(ha1 + ':' + nonce + ':' + ncStr + ':' + cnonce + ':' + qop + ':' + ha2).digest('hex');
 
-                    var authData = String.fromCharCode(opts.user.length) + opts.user +
+                    var totalLen = opts.user.length + realm.length + nonce.length + authurl.length + cnonce.length + ncStr.length + response.length + qop.length + 8;
+                    var authBuf = String.fromCharCode(0x13, 0x00, 0x00, 0x00, 0x04) + IntToStrX(totalLen) +
+                        String.fromCharCode(opts.user.length) + opts.user +
                         String.fromCharCode(realm.length) + realm +
                         String.fromCharCode(nonce.length) + nonce +
-                        String.fromCharCode('/RedirectionService'.length) + '/RedirectionService' +
+                        String.fromCharCode(authurl.length) + authurl +
                         String.fromCharCode(cnonce.length) + cnonce +
-                        String.fromCharCode(nc.length) + nc +
+                        String.fromCharCode(ncStr.length) + ncStr +
                         String.fromCharCode(response.length) + response +
                         String.fromCharCode(qop.length) + qop;
-                    var authBuf = String.fromCharCode(0x13, 0x00, 0x00, 0x00, 0x04) + IntToStrX(authData.length) + authData;
                     sendRaw(authBuf);
                 } else if (authstatus === 0) { // SUCCESS
                     obj.authState = 3;
-                    console.log('IDER-Server: Authenticated successfully');
+                    var remaining = obj.acc.length - (9 + l);
+                    console.log('IDER-Server: Authenticated successfully, remaining acc=' + remaining);
                     if (opts.onStatus) opts.onStatus('authenticated');
                     startIder();
                 } else {
@@ -459,7 +463,7 @@ module.exports.CreateServerIder = function () {
         function sendRaw(x) {
             if (obj.socket) {
                 var buf = Buffer.from(x, 'binary');
-                console.log('IDER-Server: Send ' + buf.length + ' bytes, cmd=0x' + buf[0].toString(16));
+                console.log('IDER-Server: Send ' + buf.length + ' bytes, cmd=0x' + buf[0].toString(16) + ' hex=' + buf.toString('hex').substring(0, 60));
                 obj.socket.write(buf);
                 obj.bytesToAmt += x.length;
             }
