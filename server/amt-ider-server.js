@@ -97,12 +97,13 @@ module.exports.CreateServerIder = function () {
                 obj.socket = tls.connect(port, opts.host, tlsoptions, onConnected);
             }
             obj.socket.on('data', onData);
-            obj.socket.on('close', function () { obj.Stop(); });
-            obj.socket.on('error', function (e) { if (opts.onError) opts.onError('TCP error: ' + e.code); obj.Stop(); });
+            obj.socket.on('close', function () { console.log('IDER-Server: TCP closed'); obj.Stop(); });
+            obj.socket.on('error', function (e) { console.log('IDER-Server: TCP error:', e.code); if (opts.onError) opts.onError('TCP error: ' + e.code); obj.Stop(); });
         }
 
         function onConnected() {
             if (opts.tls != 0 && obj.socket.socket) obj.socket.socket.setNoDelay(true);
+            console.log('IDER-Server: TCP connected to ' + opts.host + ':' + opts.port);
             if (opts.onStatus) opts.onStatus('connected');
             // Send IDER start redirection
             var buf = Buffer.from([0x10, 0x00, 0x00, 0x00, 0x49, 0x44, 0x45, 0x52]);
@@ -125,6 +126,12 @@ module.exports.CreateServerIder = function () {
                     len = processAuth();
                 } else {
                     len = processIderData();
+                    // Check sequence number for ALL IDER messages (bytes 4-7)
+                    if (len > 0 && obj.acc.length >= 8) {
+                        var seq = ReadIntX(obj.acc, 4);
+                        if (obj.inSequence !== seq) { console.log('IDER: Out of sequence', obj.inSequence, seq); obj.Stop(); return; }
+                        obj.inSequence++;
+                    }
                 }
                 if (len === 0) return;
                 obj.acc = obj.acc.substring(len);
@@ -181,6 +188,7 @@ module.exports.CreateServerIder = function () {
                     sendRaw(authBuf);
                 } else if (authstatus === 0) { // SUCCESS
                     obj.authState = 3;
+                    console.log('IDER-Server: Authenticated successfully');
                     if (opts.onStatus) opts.onStatus('authenticated');
                     startIder();
                 } else {
@@ -253,8 +261,6 @@ module.exports.CreateServerIder = function () {
                 case 0x4B: return 8; // HEARTBEAT
                 case 0x50: // COMMAND WRITTEN (SCSI command)
                     if (obj.acc.length < 28) return 0;
-                    if (obj.inSequence !== ReadIntX(obj.acc, 4)) { obj.Stop(); return 0; }
-                    obj.inSequence++;
                     var device = (obj.acc.charCodeAt(14) & 0x10) ? 0xB0 : 0xA0;
                     var deviceFlags = obj.acc.charCodeAt(14);
                     var cdb = obj.acc.substring(16, 28);
@@ -265,14 +271,10 @@ module.exports.CreateServerIder = function () {
                     if (obj.acc.length < 14) return 0;
                     var wlen = ReadShortX(obj.acc, 9);
                     if (obj.acc.length < 14 + wlen) return 0;
-                    if (obj.inSequence !== ReadIntX(obj.acc, 4)) { obj.Stop(); return 0; }
-                    obj.inSequence++;
                     sendCommand(0x51, String.fromCharCode(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x87, 0x70, 0x03, 0x00, 0x00, 0x00, 0xa0, 0x51, 0x07, 0x27, 0x00), true);
                     return 14 + wlen;
                 default:
-                    // For other messages, check sequence
-                    if (obj.acc.length >= 8 && obj.inSequence !== ReadIntX(obj.acc, 4)) { /* skip */ }
-                    obj.inSequence++;
+                    console.log('IDER-Server: Unknown command', obj.acc.charCodeAt(0));
                     return 8;
             }
         }
