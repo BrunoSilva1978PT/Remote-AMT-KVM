@@ -239,14 +239,17 @@ module.exports.CreateWebServer = function (args) {
         // When data is received from the web socket, forward the data into the associated TCP connection.
         // If the TCP connection is pending, buffer up the data until it connects.
         ws.on('message', function (msg) {
-            // Convert a buffer into a string
-            var msg2 = "";
-            for (var i = 0; i < msg.length; i++) { msg2 += String.fromCharCode(msg[i]); }
-            msg = msg2;
+            // Ensure msg is a Buffer for direct binary relay
+            if (!(msg instanceof Buffer)) { msg = Buffer.from(msg); }
 
-            if (ws.interceptor) { msg = ws.interceptor.processBrowserData(msg); } // Run data thru interceptor
+            if (ws.interceptor) {
+                // Interceptor expects binary string, convert only when interceptor is active
+                var str = msg.toString('binary');
+                str = ws.interceptor.processBrowserData(str);
+                msg = Buffer.from(str, 'binary');
+            }
             if (ws._tcpReady) {
-                ws.forwardclient.write(Buffer.from(msg, 'ascii'));
+                ws.forwardclient.write(msg);
             } else {
                 ws._msgBuffer.push(msg); // Buffer until TCP is connected
             }
@@ -262,7 +265,7 @@ module.exports.CreateWebServer = function (args) {
         function flushBuffer() {
             ws._tcpReady = true;
             for (var i = 0; i < ws._msgBuffer.length; i++) {
-                ws.forwardclient.write(Buffer.from(ws._msgBuffer[i], 'ascii'));
+                ws.forwardclient.write(ws._msgBuffer[i]);
             }
             ws._msgBuffer = [];
         }
@@ -272,23 +275,28 @@ module.exports.CreateWebServer = function (args) {
         if (req.query.tls == 0) {
             // If this is TCP (without TLS) set a normal TCP socket
             ws.forwardclient = new obj.net.Socket();
-            ws.forwardclient.setEncoding('binary');
+            ws.forwardclient.setNoDelay(true); // Disable Nagle for lower latency
             ws.forwardclient.forwardwsocket = ws;
         } else {
             // If TLS is going to be used, setup a TLS socket
             var tlsoptions = { minVersion: 'TLSv1', maxVersion: (req.query.tls1only == 1) ? 'TLSv1' : undefined, ciphers: 'RSA+AES:!aNULL:!MD5:!DSS', secureOptions: obj.constants.SSL_OP_NO_SSLv2 | obj.constants.SSL_OP_NO_SSLv3 | obj.constants.SSL_OP_NO_COMPRESSION | obj.constants.SSL_OP_CIPHER_SERVER_PREFERENCE, rejectUnauthorized: false };
             ws.forwardclient = obj.tls.connect(req.query.port, req.query.host, tlsoptions, function () {
                 obj.debug("TLS connected to " + req.query.host + ':' + req.query.port + '.');
+                ws.forwardclient.socket.setNoDelay(true); // Disable Nagle for lower latency
                 flushBuffer();
             });
-            ws.forwardclient.setEncoding('binary');
             ws.forwardclient.forwardwsocket = ws;
         }
-        
+
         // When we receive data on the TCP connection, forward it back into the web socket connection.
         ws.forwardclient.on('data', function (data) {
-            if (ws.interceptor) { data = ws.interceptor.processAmtData(data); } // Run data thru interceptor
-            try { ws.send(Buffer.from(data, 'ascii')); } catch (ex) { }
+            // data is already a Buffer from TCP socket
+            if (ws.interceptor) {
+                var str = data.toString('binary');
+                str = ws.interceptor.processAmtData(str);
+                data = Buffer.from(str, 'binary');
+            }
+            try { ws.send(data); } catch (ex) { }
         });
         
         // If the TCP connection closes, disconnect the associated web socket.
