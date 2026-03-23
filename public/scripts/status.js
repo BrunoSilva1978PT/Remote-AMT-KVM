@@ -197,21 +197,27 @@ function showFeaturesDlg() {
     if (xxdialogMode || !xxAccountAdminName) return;
     idx_d9redir.checked = amtfeatures[0]; idx_d9kvm.checked = amtfeatures[3]; idx_d9ider.checked = amtfeatures[2]; idx_d9sol.checked = amtfeatures[1];
     QV('idx_d9kvm_div', amtfeatures[3] != null);
+    QH('idx_d9ider_label', (amtversion >= 11) ? 'USB-Redirection' : 'IDE-Redirection');
     setDialogMode(9, "Intel&reg; AMT Features", 3, function() {
         var r = amtsysstate['AMT_RedirectionService'].response;
         r['ListenerEnabled'] = idx_d9redir.checked;
         r['EnabledState'] = 32768 + ((idx_d9ider.checked?1:0) + (idx_d9sol.checked?2:0));
         amtstack.AMT_RedirectionService_RequestStateChange(r['EnabledState'], function (stack, name, response, status) {
             if (status != 200) { messagebox("Error", "RequestStateChange Error " + status); return; }
+            function putRedirService() {
+                amtstack.Put('AMT_RedirectionService', r, function (stack, name, response, status) {
+                    if (status != 200) { messagebox("Error", "PUT Error " + status); return; }
+                    amtstack.Get('AMT_RedirectionService', function(s,n,r,st) { if (st==200) { amtsysstate['AMT_RedirectionService'].response = r.Body; updateSystemStatus(); } }, 0, 1);
+                    if (amtfeatures[3] != null) { amtstack.Get('CIM_KVMRedirectionSAP', function(s,n,r,st) { if (st==200) { amtsysstate['CIM_KVMRedirectionSAP'].response = r.Body; updateSystemStatus(); } }, 0, 1); }
+                }, 0, 1);
+            }
             if (amtfeatures[3] != null) {
                 amtstack.CIM_KVMRedirectionSAP_RequestStateChange((idx_d9kvm.checked) ? 2 : 3, 0, function (stack, name, response, status) {
                     if (status != 200) { messagebox("Error", "KVM RequestStateChange Error " + status); return; }
-                    amtstack.Put('AMT_RedirectionService', r, function (stack, name, response, status) {
-                        if (status != 200) { messagebox("Error", "PUT Error " + status); return; }
-                        amtstack.Get('AMT_RedirectionService', function(s,n,r,st) { if (st==200) { amtsysstate['AMT_RedirectionService'].response = r.Body; updateSystemStatus(); } }, 0, 1);
-                        amtstack.Get('CIM_KVMRedirectionSAP', function(s,n,r,st) { if (st==200) { amtsysstate['CIM_KVMRedirectionSAP'].response = r.Body; updateSystemStatus(); } }, 0, 1);
-                    }, 0, 1);
+                    putRedirService();
                 });
+            } else {
+                putRedirService();
             }
         });
     });
