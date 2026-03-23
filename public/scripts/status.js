@@ -251,54 +251,56 @@ function powerActionDlgCheck() {
     powerActionDlg();
 }
 
+function powerActionResult(success, msg) {
+    QH('id_dialogMessage', msg || (success ? "Power action completed." : "Power action failed."));
+    setDialogMode(1, "Power Action", 0);
+    setTimeout(function () { setDialogMode(0); }, success ? 1300 : 3000);
+}
+
+function powerActionTimeout() {
+    return setTimeout(function () { powerActionResult(false, "Power action timed out. The AMT device may not have responded."); }, 15000);
+}
+
+function powerActionBootToSource(bootSourceInstanceID, bootSettings, powerState) {
+    var timer = powerActionTimeout();
+    amtstack.SetBootConfigRole(1, function (stack, name, response, status) {
+        if (status !== 200) { clearTimeout(timer); powerActionResult(false, "SetBootConfigRole failed (error " + status + ")."); return; }
+        var sourceXml = bootSourceInstanceID ? '<Address xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2004/08/addressing</Address><ReferenceParameters xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing"><ResourceURI xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_BootSourceSetting</ResourceURI><SelectorSet xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"><Selector Name="InstanceID">' + bootSourceInstanceID + '</Selector></SelectorSet></ReferenceParameters>' : null;
+        amtstack.CIM_BootConfigSetting_ChangeBootOrder(sourceXml, function (stack, name, response, status) {
+            if (status !== 200) { clearTimeout(timer); powerActionResult(false, "ChangeBootOrder failed (error " + status + ")."); return; }
+            amtstack.Put('AMT_BootSettingData', bootSettings || {}, function (stack, name, response, status) {
+                if (status !== 200) { clearTimeout(timer); powerActionResult(false, "Put BootSettingData failed (error " + status + ")."); return; }
+                amtstack.RequestPowerStateChange(powerState, function (stack, name, response, status) {
+                    clearTimeout(timer);
+                    if (status == 200) { powerActionResult(true); } else { powerActionResult(false, "RequestPowerStateChange failed (error " + status + ")."); }
+                });
+            }, 0, 1);
+        });
+    });
+}
+
 function powerActionDlg() {
     var action = parseInt(d5actionSelect.value);
     statusbox("Power Actions", "Performing action...");
+
     if (action < 100) {
+        // Direct power state changes: Reset(10), Power cycle(5), Power down(8), Soft-off(12), Soft-reset(14), Sleep(4), Hibernate(7), Power up(2)
+        var timer = powerActionTimeout();
         amtstack.RequestPowerStateChange(action, function (stack, name, response, status) {
-            if (status == 200) { QH('id_dialogMessage', "Power action completed."); } else { QH('id_dialogMessage', format("Power action error #{0}.", status)); }
-            setDialogMode(1, "Power Action", 0);
-            setTimeout(function () { setDialogMode(0); }, 1300);
+            clearTimeout(timer);
+            if (status == 200) { powerActionResult(true); } else { powerActionResult(false, format("Power action error #{0}.", status)); }
         });
     } else if (action == 100 || action == 101) {
         // Boot to BIOS
-        amtstack.SetBootConfigRole(1, function (stack, name, response, status) {
-            var bootSource = 'CIM_BootSourceSetting', settings = amtsysstate['AMT_BootCapabilities'].response;
-            amtstack.CIM_BootConfigSetting_ChangeBootOrder(null, function () {
-                amtstack.Put('AMT_BootSettingData', { BIOSSetup: true }, function () {
-                    amtstack.RequestPowerStateChange((action == 100)?2:10, function (stack, name, response, status) {
-                        if (status == 200) QH('id_dialogMessage', "Power action completed."); else QH('id_dialogMessage', "Power action error.");
-                        setDialogMode(1, "Power Action", 0); setTimeout(function () { setDialogMode(0); }, 1300);
-                    });
-                }, 0, 1);
-            });
-        });
+        powerActionBootToSource(null, { BIOSSetup: true }, (action == 100) ? 2 : 10);
     } else if (action >= 200 && action <= 203) {
         // Boot to IDE-R Floppy/CDROM
         var isFloppy = (action == 200 || action == 202);
         var isReset = (action == 200 || action == 201);
         var bootInstanceID = isFloppy ? 'Intel(r) AMT: Force Floppy/LS120 Boot' : 'Intel(r) AMT: Force CD/DVD Boot';
-        amtstack.SetBootConfigRole(1, function () {
-            amtstack.CIM_BootConfigSetting_ChangeBootOrder('<Address xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2004/08/addressing</Address><ReferenceParameters xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing"><ResourceURI xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_BootSourceSetting</ResourceURI><SelectorSet xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"><Selector Name="InstanceID">' + bootInstanceID + '</Selector></SelectorSet></ReferenceParameters>', function () {
-                amtstack.Put('AMT_BootSettingData', { UseIDER: true }, function () {
-                    amtstack.RequestPowerStateChange(isReset ? 10 : 2, function (stack, name, response, status) {
-                        if (status == 200) QH('id_dialogMessage', "Power action completed."); else QH('id_dialogMessage', "Power action error.");
-                        setDialogMode(1, "Power Action", 0); setTimeout(function () { setDialogMode(0); }, 1300);
-                    });
-                }, 0, 1);
-            });
-        });
+        powerActionBootToSource(bootInstanceID, { UseIDER: true }, isReset ? 10 : 2);
     } else if (action == 400 || action == 401) {
         // Boot to PXE
-        amtstack.SetBootConfigRole(1, function () {
-            amtstack.CIM_BootConfigSetting_ChangeBootOrder('<Address xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2004/08/addressing</Address><ReferenceParameters xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing"><ResourceURI xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_BootSourceSetting</ResourceURI><SelectorSet xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"><Selector Name="InstanceID">Intel(r) AMT: Force PXE Boot</Selector></SelectorSet></ReferenceParameters>', function () {
-                amtstack.Put('AMT_BootSettingData', {}, function () {
-                    amtstack.RequestPowerStateChange((action == 400)?10:2, function (stack, name, response, status) {
-                        if (status == 200) QH('id_dialogMessage', "Power action completed."); else QH('id_dialogMessage', "Power action error.");
-                        setDialogMode(1, "Power Action", 0); setTimeout(function () { setDialogMode(0); }, 1300);
-                    });
-                }, 0, 1);
-            });
-        });
+        powerActionBootToSource('Intel(r) AMT: Force PXE Boot', {}, (action == 400) ? 10 : 2);
     }
 }
