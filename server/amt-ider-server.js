@@ -161,7 +161,28 @@ module.exports.CreateServerIder = function () {
                 var authstatus = obj.acc.charCodeAt(1);
                 var authType = obj.acc.charCodeAt(4);
 
-                if (authType === 4 && authstatus === 1) { // DIGEST challenge
+                if (authType === 0 && authstatus === 0) {
+                    // Step 1: Query response - list of available auth methods
+                    // Check if digest (4) is available, then send empty digest to trigger challenge
+                    var methods = [];
+                    for (var mi = 0; mi < l; mi++) { methods.push(obj.acc.charCodeAt(9 + mi)); }
+                    console.log('IDER-Server: Auth methods available:', methods);
+                    if (methods.indexOf(4) >= 0) {
+                        // Send empty digest auth request to trigger challenge (same as client-side)
+                        var authurl = '/RedirectionService';
+                        var emptyAuth = String.fromCharCode(0x13, 0x00, 0x00, 0x00, 0x04) +
+                            IntToStrX(opts.user.length + authurl.length + 8) +
+                            String.fromCharCode(opts.user.length) + opts.user +
+                            String.fromCharCode(0x00, 0x00) +
+                            String.fromCharCode(authurl.length) + authurl +
+                            String.fromCharCode(0x00, 0x00, 0x00, 0x00);
+                        sendRaw(emptyAuth);
+                    } else {
+                        if (opts.onError) opts.onError('Digest auth not supported');
+                        obj.Stop();
+                    }
+                    return 9 + l;
+                } else if (authType === 4 && authstatus === 1) { // DIGEST challenge
                     var realmlen = obj.acc.charCodeAt(9);
                     var realm = obj.acc.substring(10, 10 + realmlen);
                     var noncelen = obj.acc.charCodeAt(10 + realmlen);
@@ -189,7 +210,7 @@ module.exports.CreateServerIder = function () {
                         String.fromCharCode(response.length) + response +
                         String.fromCharCode(qop.length) + qop;
                     sendRaw(authBuf);
-                } else if (authstatus === 0) { // SUCCESS
+                } else if (authType !== 0 && authstatus === 0) { // SUCCESS (real auth, not query)
                     obj.authState = 3;
                     var remaining = obj.acc.length - (9 + l);
                     console.log('IDER-Server: Authenticated successfully, remaining acc=' + remaining);
