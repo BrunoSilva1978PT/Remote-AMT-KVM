@@ -456,15 +456,10 @@ function onIderFileSelected(e) {
     if (!file) return;
     e.target.value = ''; // Reset so same file can be re-selected
 
-    // USB-R (AMT v11+): mount as disk device (0xA0) only - appears as USB drive (sdX)
-    // IDE-R (AMT <11): mount as CD-ROM device (0xB0) only - appears as IDE CD (sr0)
-    if (currentcomputer && currentcomputer['usbr']) {
-        ider.m.floppy = file;
-        ider.m.cdrom = null;
-    } else {
-        ider.m.cdrom = file;
-        ider.m.floppy = null;
-    }
+    // Mount ISO as CD-ROM (0xB0) - same behavior for IDE-R and USB-R
+    // AMT firmware handles the presentation (IDE vs USB) transparently
+    ider.m.cdrom = file;
+    ider.m.floppy = null;
     ider.m.iderStart = 0; // OnReboot - firmware detects device during boot
 
     // Connect IDER to the AMT device using same credentials as KVM

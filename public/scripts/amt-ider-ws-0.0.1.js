@@ -52,11 +52,6 @@ var CreateAmtRemoteIder = function () {
     var IDE_CD_PowerManagement = String.fromCharCode(0x01, 0x00, 0x03, 0x00);
     var IDE_CD_Timeout = String.fromCharCode(0x01, 0x05, 0x03, 0x00);
 
-    // USB-R mode: generic removable disk mode sense pages (for ISOs mounted as USB disk)
-    var IDE_ModeSence_UsbDisk_Page_Array = String.fromCharCode(0x00, 0x12, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x08, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
-    var IDE_ModeSence_3F_UsbDisk_Array = String.fromCharCode(0x00, 0x1C, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x08, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
-    var IDE_ModeSence_UsbDiskError_Recovery_Array = String.fromCharCode(0x00, 0x12, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00);
-
     // 0x01 constant data
     var IDE_ModeSence_FloppyError_Recovery_Array = String.fromCharCode(0x00, 0x12, 0x24, 0x80, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00);
     var IDE_ModeSence_Ls120Error_Recovery_Array = String.fromCharCode(0x00, 0x12, 0x31, 0x80, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00);
@@ -77,6 +72,7 @@ var CreateAmtRemoteIder = function () {
         obj.bytesFromAmt = 0;
         obj.inSequence = 0;
         obj.outSequence = 0;
+        g_readQueue = [];
         clearDiskCache();
 
         // Send first command, OPEN_SESSION
@@ -263,21 +259,6 @@ var CreateAmtRemoteIder = function () {
         var lba;
         var len;
 
-        // If the device channel has no media, reject all commands with NOT READY / NO MEDIUM
-        // This prevents the OS from retrying reads on an empty channel (e.g. sr0 in USB-R mode)
-        var hasMedia = (dev == 0xA0) ? (obj.floppy != null) : (obj.cdrom != null);
-        if (!hasMedia) {
-            var cmd = cdb.charCodeAt(0);
-            if (cmd == 0x00) { // TEST_UNIT_READY - always respond (required for device detection)
-                obj.SendCommandEndResponse(1, 0x02, dev, 0x3a, 0x00);
-            } else if (cmd == 0x03) { // REQUEST_SENSE - return no medium sense data
-                obj.SendDataToHost(dev, true, String.fromCharCode(0x70, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x3A, 0x00, 0x00, 0x00, 0x00, 0x00), featureRegister & 1);
-            } else {
-                obj.SendCommandEndResponse(1, 0x02, dev, 0x3a, 0x00); // NOT READY, MEDIUM NOT PRESENT
-            }
-            return -1;
-        }
-
         switch(cdb.charCodeAt(0))
         {
             case 0x00: // TEST_UNIT_READY:
@@ -373,8 +354,7 @@ var CreateAmtRemoteIder = function () {
                         return -1;
                 }
 
-                var blockSize = (dev == 0xB0) ? 0x0800 : 0x0200; // 2048 for CD, 512 for disk
-                obj.SendDataToHost(dev, true, IntToStr(8) + IntToStr(sectors) + String.fromCharCode(0x02, 0x00, (blockSize >> 8) & 0xFF, blockSize & 0xFF), featureRegister & 1);
+                obj.SendDataToHost(dev, true, IntToStr(8) + String.fromCharCode(0x00, 0x00, 0x0b, 0x40, 0x02, 0x00, 0x02, 0x00), featureRegister & 1);
                 break;
             case 0x25: // READ_CAPACITY
                 debug("SCSI: READ_CAPACITY", dev);
@@ -507,12 +487,10 @@ var CreateAmtRemoteIder = function () {
                     if (obj.cdrom != null) { sectorCount = (obj.cdrom.size >> 11); }
                 }
 
-                var isUsbDisk = (dev == 0xA0) && (sectorCount > 0x3C300); // > LS-120 size = USB disk mode (ISO mounted as disk)
                 switch (cdb.charCodeAt(2) & 0x3f) {
-                    case 0x01: if (dev == 0xA0) { r = isUsbDisk ? IDE_ModeSence_UsbDiskError_Recovery_Array : ((sectorCount <= 0xb40)?IDE_ModeSence_FloppyError_Recovery_Array:IDE_ModeSence_Ls120Error_Recovery_Array); } else { r = IDE_ModeSence_CDError_Recovery_Array; } break;
-                    case 0x05: if (dev == 0xA0 && !isUsbDisk) { r = (sectorCount <= 0xb40)?IDE_ModeSence_FloppyDisk_Page_Array:IDE_ModeSence_LS120Disk_Page_Array; } break;
-                    case 0x08: if (isUsbDisk) { r = IDE_ModeSence_UsbDisk_Page_Array; } break;
-                    case 0x3f: if (dev == 0xA0) { r = isUsbDisk ? IDE_ModeSence_3F_UsbDisk_Array : ((sectorCount <= 0xb40)?IDE_ModeSence_3F_Floppy_Array:IDE_ModeSence_3F_LS120_Array); } else { r = IDE_ModeSence_3F_CD_Array; } break;
+                    case 0x01: if (dev == 0xA0) { r = (sectorCount <= 0xb40)?IDE_ModeSence_FloppyError_Recovery_Array:IDE_ModeSence_Ls120Error_Recovery_Array; } else { r = IDE_ModeSence_CDError_Recovery_Array; } break;
+                    case 0x05: if (dev == 0xA0) { r = (sectorCount <= 0xb40)?IDE_ModeSence_FloppyDisk_Page_Array:IDE_ModeSence_LS120Disk_Page_Array; } break;
+                    case 0x3f: if (dev == 0xA0) { r = (sectorCount <= 0xb40)?IDE_ModeSence_3F_Floppy_Array:IDE_ModeSence_3F_LS120_Array; } else { r = IDE_ModeSence_3F_CD_Array; } break;
                     case 0x1A: if (dev == 0xB0) { r = IDE_ModeSence_CD_1A_Array; } break;
                     case 0x1D: if (dev == 0xB0) { r = IDE_ModeSence_CD_1D_Array; } break;
                     case 0x2A: if (dev == 0xB0) { r = IDE_ModeSence_CD_2A_Array; } break;
@@ -539,14 +517,13 @@ var CreateAmtRemoteIder = function () {
         var mediaBlocks = 0;
         if (dev == 0xA0) { media = obj.floppy; if (obj.floppy != null) { mediaBlocks = (obj.floppy.size >> 9); } }
         if (dev == 0xB0) { media = obj.cdrom; if (obj.cdrom != null) { mediaBlocks = (obj.cdrom.size >> 11); } }
-        if (media == null) { obj.SendCommandEndResponse(1, 0x02, dev, 0x3a, 0x00); return 0; } // No medium present
         if ((len < 0) || (lba + len > mediaBlocks)) { obj.SendCommandEndResponse(1, 0x05, dev, 0x21, 0x00); return 0; }
         if (len == 0) { obj.SendCommandEndResponse(1, 0x00, dev, 0x00, 0x00); return 0; }
         if (media != null) {
             if (dev == 0xA0) { lba <<= 9; len <<= 9; } else { lba <<= 11; len <<= 11; }
             if (g_media !== null) {
-                console.log('IDERERROR: Read while performing read');
-                obj.Stop();
+                // Queue read operation instead of crashing
+                g_readQueue.push({ media: media, dev: dev, lba: lba, len: len, fr: featureRegister });
             } else {
                 // obj.iderinfo.readbfr // TODO: MaxRead
                 g_media = media;
@@ -560,6 +537,7 @@ var CreateAmtRemoteIder = function () {
 
     var g_reset = false;
     var g_media = null;
+    var g_readQueue = [];
     var g_dev;
     var g_lba;
     var g_len;
@@ -630,7 +608,8 @@ var CreateAmtRemoteIder = function () {
                 sendDiskDataEx(featureRegister);
             } else {
                 g_media = null;
-                if (g_reset) { obj.SendCommand(0x47); g_reset = false; }
+                if (g_reset) { obj.SendCommand(0x47); g_readQueue = []; g_reset = false; }
+                else if (g_readQueue.length > 0) { var op = g_readQueue.shift(); g_media = op.media; g_dev = op.dev; g_lba = op.lba; g_len = op.len; sendDiskDataEx(op.fr); }
             }
             return;
         }
@@ -663,7 +642,8 @@ var CreateAmtRemoteIder = function () {
                 sendDiskDataEx(featureRegister);
             } else {
                 g_media = null;
-                if (g_reset) { obj.SendCommand(0x47); g_reset = false; }
+                if (g_reset) { obj.SendCommand(0x47); g_readQueue = []; g_reset = false; }
+                else if (g_readQueue.length > 0) { var op = g_readQueue.shift(); g_media = op.media; g_dev = op.dev; g_lba = op.lba; g_len = op.len; sendDiskDataEx(op.fr); }
             }
         };
         debug('IDER-CacheMiss: preloading ' + blockLen + ' bytes from offset ' + blockStart);
