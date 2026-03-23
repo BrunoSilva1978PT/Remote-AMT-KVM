@@ -182,7 +182,8 @@ module.exports.CreateServerIder = function () {
                         obj.Stop();
                     }
                     return 9 + l;
-                } else if (authType === 4 && authstatus === 1) { // DIGEST challenge
+                } else if (authType === 4 && authstatus === 1 && obj.authState < 4) { // DIGEST challenge (only process once)
+                    obj.authState = 4; // Mark as "credentials sent, waiting for result"
                     var realmlen = obj.acc.charCodeAt(9);
                     var realm = obj.acc.substring(10, 10 + realmlen);
                     var noncelen = obj.acc.charCodeAt(10 + realmlen);
