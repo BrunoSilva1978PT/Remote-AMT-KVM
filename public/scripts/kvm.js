@@ -448,6 +448,9 @@ function showOcrResult(text, copied) {
 // ========== IDE-R (Virtual Media) ==========
 
 var iderMountMode = 'cdrom'; // 'usb' or 'cdrom'
+var iderServerSide = false;  // true when using server-side IDER
+var iderServerFile = null;   // name of mounted file for display
+var iderStatusTimer = null;
 
 function mountIderImage(mode) {
     iderMountMode = mode || 'cdrom';
@@ -459,38 +462,110 @@ function onIderFileSelected(e) {
     if (!file) return;
     e.target.value = ''; // Reset so same file can be re-selected
 
+    // Try server-side IDER first (direct Node.js → AMT, much faster)
+    // Electron exposes file.path for local files
+    if (file.path) {
+        startServerSideIder(file.path, file.name);
+        return;
+    }
+
+    // Fallback: browser-side IDER (WebSocket relay)
+    iderServerSide = false;
     if (iderMountMode === 'usb') {
-        // USB disk mode: ISO on floppy/disk channel (0xA0) - appears as sdX, no CD-ROM speed cap
-        // Dummy blob on cdrom channel (0xB0) prevents sr0 kernel I/O errors
         ider.m.floppy = file;
         ider.m.cdrom = new Blob([new ArrayBuffer(2048)], { type: 'application/octet-stream' });
         ider.m.cdrom.name = 'dummy.iso';
         ider.m.cdrom.size = 2048;
     } else {
-        // CD-ROM mode: ISO on cdrom channel (0xB0) - traditional IDE-R/USB-R CD-ROM
         ider.m.cdrom = file;
         ider.m.floppy = null;
     }
-    ider.m.iderStart = 0; // OnReboot - firmware detects device during boot
-
-    // Connect IDER to the AMT device using same credentials as KVM
+    ider.m.iderStart = 0;
     if (ider.State == 0) {
         var ports = portsFromHost(currentcomputer['host'], currentcomputer['tls']);
         ider.Start(ports.host, ports.redir, amtstack.wsman.comm.user, amtstack.wsman.comm.pass, currentcomputer['tls']);
     }
 }
 
+function startServerSideIder(filePath, fileName) {
+    iderServerSide = true;
+    iderServerFile = fileName;
+    var ports = portsFromHost(currentcomputer['host'], currentcomputer['tls']);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/ider-server.ashx', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+                updateIderUI();
+                // Poll status
+                if (iderStatusTimer) clearInterval(iderStatusTimer);
+                iderStatusTimer = setInterval(pollIderStatus, 2000);
+            } else {
+                iderServerSide = false;
+                if (xhr.responseText) { try { var r = JSON.parse(xhr.responseText); console.log('Server IDER error:', r.error); } catch(e) {} }
+            }
+        }
+    };
+    xhr.send(JSON.stringify({
+        action: 'start',
+        host: ports.host,
+        port: ports.redir,
+        user: amtstack.wsman.comm.user,
+        pass: amtstack.wsman.comm.pass,
+        tls: currentcomputer['tls'],
+        isoPath: filePath,
+        mountMode: iderMountMode,
+        iderStart: 0
+    }));
+}
+
+function pollIderStatus() {
+    if (!iderServerSide) { if (iderStatusTimer) { clearInterval(iderStatusTimer); iderStatusTimer = null; } return; }
+    var ports = portsFromHost(currentcomputer['host'], currentcomputer['tls']);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/ider-server.ashx', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+            try {
+                var r = JSON.parse(xhr.responseText);
+                if (r.status === 'stopped' || r.status === 'error' || r.status === 'not_running') {
+                    iderServerSide = false;
+                    if (iderStatusTimer) { clearInterval(iderStatusTimer); iderStatusTimer = null; }
+                }
+                updateIderUI();
+            } catch (e) { }
+        }
+    };
+    xhr.send(JSON.stringify({ action: 'status', host: ports.host }));
+}
+
 function ejectIder() {
-    if (ider.State != 0) {
-        ider.m.cdrom = null;
-        ider.m.floppy = null;
-        ider.Stop();
+    if (iderServerSide) {
+        var ports = portsFromHost(currentcomputer['host'], currentcomputer['tls']);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/ider-server.ashx', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.onreadystatechange = function () {
+            iderServerSide = false;
+            iderServerFile = null;
+            if (iderStatusTimer) { clearInterval(iderStatusTimer); iderStatusTimer = null; }
+            updateIderUI();
+        };
+        xhr.send(JSON.stringify({ action: 'stop', host: ports.host }));
+    } else {
+        if (ider.State != 0) {
+            ider.m.cdrom = null;
+            ider.m.floppy = null;
+            ider.Stop();
+        }
+        updateIderUI();
     }
-    updateIderUI();
 }
 
 function onIderStateChange(obj, state) {
-    updateIderUI();
+    if (!iderServerSide) updateIderUI();
     if (state == 0 && ider.m) {
         ider.m.cdrom = null;
         ider.m.floppy = null;
@@ -499,20 +574,23 @@ function onIderStateChange(obj, state) {
 
 function updateIderUI() {
     var iderEnabled = amtfeatures[2]; // IDER/USB-R feature enabled in AMT
-    var connected = (ider && ider.State == 3);
-    var hasMedia = (ider && ider.m && ((ider.m.cdrom && ider.m.cdrom.size > 2048) || ider.m.floppy));
+    var browserConnected = (ider && ider.State == 3);
+    var active = iderServerSide || browserConnected;
 
-    // Hide mount buttons when IDER/USB-R is not enabled in AMT
-    QV('iderMountUsbBtn', iderEnabled && !connected);
-    QV('iderMountCdBtn', iderEnabled && !connected);
-    QV('iderEjectBtn', connected && iderEnabled);
+    // Hide mount buttons when IDER/USB-R is not enabled or session is active
+    QV('iderMountUsbBtn', iderEnabled && !active);
+    QV('iderMountCdBtn', iderEnabled && !active);
+    QV('iderEjectBtn', active && iderEnabled);
 
     if (!iderEnabled) {
         Q('iderStatus').textContent = '';
         return;
     }
 
-    if (connected && hasMedia) {
+    if (iderServerSide) {
+        var modeLabel = (iderMountMode === 'usb') ? ' (USB)' : ' (CD-ROM)';
+        Q('iderStatus').textContent = '💿 ' + (iderServerFile || '') + modeLabel;
+    } else if (browserConnected) {
         var name = '';
         if (iderMountMode === 'usb' && ider.m.floppy) { name = ider.m.floppy.name; }
         else if (ider.m.cdrom && ider.m.cdrom.size > 2048) { name = ider.m.cdrom.name; }

@@ -20,8 +20,10 @@ module.exports.CreateWebServer = function (args) {
     obj.expressWs = require('express-ws')(obj.app);
     obj.interceptor = require('./interceptor');
     obj.common = require('./common.js');
+    obj.iderServer = require('./amt-ider-server.js').CreateServerIder();
     obj.constants = require('crypto').constants || require('constants');
     obj.computerlist = null;
+    obj.activeIderSessions = {}; // host -> ider session
 
     obj.debug = function (msg) { if (args.debug) { console.log(msg); } }
     
@@ -159,6 +161,68 @@ module.exports.CreateWebServer = function (args) {
         // Scan each subnet, skip .0 and .255
         for (var s = 0; s < subnets.length; s++) {
             for (var h = 1; h < 255; h++) { scanHost(subnets[s], h); }
+        }
+    });
+
+    // Server-side IDER: mount ISO directly from Node.js (no browser relay)
+    obj.app.use(obj.express.json());
+
+    obj.app.post('/ider-server.ashx', function (req, res) {
+        res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0', 'Content-Type': 'application/json' });
+        var action = req.body.action;
+
+        if (action === 'start') {
+            var host = req.body.host;
+            var port = parseInt(req.body.port) || 16994;
+            var user = req.body.user;
+            var pass = req.body.pass;
+            var tlsFlag = parseInt(req.body.tls) || 0;
+            var isoPath = req.body.isoPath;
+            var mountMode = req.body.mountMode || 'cdrom';
+            var iderStart = parseInt(req.body.iderStart) || 0;
+
+            if (!host || !user || !pass || !isoPath) { res.status(400).send(JSON.stringify({ error: 'Missing parameters' })); return; }
+
+            // Stop existing session for this host
+            if (obj.activeIderSessions[host]) { obj.activeIderSessions[host].Stop(); delete obj.activeIderSessions[host]; }
+
+            var session = obj.iderServer.startSession({
+                host: host, port: port, user: user, pass: pass, tls: tlsFlag,
+                isoPath: isoPath, mountMode: mountMode, iderStart: iderStart,
+                onStatus: function (status, data) {
+                    // Store latest status
+                    if (obj.activeIderSessions[host]) { obj.activeIderSessions[host]._status = status; obj.activeIderSessions[host]._statusData = data; }
+                },
+                onError: function (err) {
+                    if (obj.activeIderSessions[host]) { obj.activeIderSessions[host]._status = 'error'; obj.activeIderSessions[host]._error = err; }
+                }
+            });
+
+            if (session) {
+                obj.activeIderSessions[host] = session;
+                res.send(JSON.stringify({ status: 'starting', host: host }));
+            } else {
+                res.status(500).send(JSON.stringify({ error: 'Failed to start IDER session' }));
+            }
+        } else if (action === 'stop') {
+            var host = req.body.host;
+            if (obj.activeIderSessions[host]) {
+                obj.activeIderSessions[host].Stop();
+                delete obj.activeIderSessions[host];
+                res.send(JSON.stringify({ status: 'stopped', host: host }));
+            } else {
+                res.send(JSON.stringify({ status: 'not_running', host: host }));
+            }
+        } else if (action === 'status') {
+            var host = req.body.host;
+            var session = obj.activeIderSessions[host];
+            if (session) {
+                res.send(JSON.stringify({ status: session._status || 'unknown', error: session._error, bytesToAmt: session.bytesToAmt, bytesFromAmt: session.bytesFromAmt, readbfr: session.iderinfo ? session.iderinfo.readbfr : 0 }));
+            } else {
+                res.send(JSON.stringify({ status: 'not_running' }));
+            }
+        } else {
+            res.status(400).send(JSON.stringify({ error: 'Unknown action' }));
         }
     });
 
