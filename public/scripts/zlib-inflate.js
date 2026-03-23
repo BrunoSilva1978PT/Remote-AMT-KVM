@@ -1942,6 +1942,48 @@ ZLIB.z_stream.prototype.inflate = function(input_string, opts)
     return result;
 };
 
+// Binary inflate - returns Uint8Array directly, avoiding strToArr conversion overhead
+ZLIB.z_stream.prototype.inflateBinary = function(input_string, opts)
+{
+    var flush;
+    var avail_out;
+    var DEFAULT_BUFFER_SIZE = 16384;
+
+    this.input_data = input_string;
+    this.next_in = getarg(opts, 'next_in', 0);
+    this.avail_in = getarg(opts, 'avail_in', input_string.length - this.next_in);
+
+    flush = getarg(opts, 'flush', ZLIB.Z_SYNC_FLUSH);
+    avail_out = getarg(opts, 'avail_out', -1);
+
+    var chunks = [];
+    var totalLen = 0;
+    do {
+        this.avail_out = (avail_out >= 0 ? avail_out : DEFAULT_BUFFER_SIZE);
+        this.output_data = '';
+        this.next_out = 0;
+        this.error = ZLIB.inflate(this, flush);
+        if (this.output_data.length > 0) {
+            var chunk = new Uint8Array(this.output_data.length);
+            for (var i = 0, len = this.output_data.length; i < len; i++) { chunk[i] = this.output_data.charCodeAt(i); }
+            chunks.push(chunk);
+            totalLen += chunk.length;
+        }
+        if (avail_out >= 0) {
+            return chunks.length > 0 ? chunks[0] : new Uint8Array(0);
+        }
+        if (this.avail_out > 0) { break; }
+    } while (this.error == ZLIB.Z_OK);
+
+    // Fast path: single chunk (most common case)
+    if (chunks.length == 1) return chunks[0];
+    if (chunks.length == 0) return new Uint8Array(0);
+    // Merge chunks
+    var result = new Uint8Array(totalLen);
+    for (var i = 0, off = 0; i < chunks.length; i++) { result.set(chunks[i], off); off += chunks[i].length; }
+    return result;
+};
+
 ZLIB.z_stream.prototype.inflateReset = function(windowBits)
 {
     return ZLIB.inflateReset(this, windowBits);

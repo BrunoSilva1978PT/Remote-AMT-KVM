@@ -60,23 +60,23 @@ var CreateAmtRedirect = function (module, authCookie) {
         if (!e.data || obj.connectstate == -1) return;
         obj.inDataCount++;
 
-        // KVM traffic, forward it directly.
+        // KVM/IDER traffic, forward it directly - zero-copy fast path
         if ((obj.connectstate == 1) && ((obj.protocol == 2) || (obj.protocol == 3))) {
             var rawData = (e.data instanceof ArrayBuffer) ? new Uint8Array(e.data) : e.data;
             return obj.m.ProcessBinaryData ? obj.m.ProcessBinaryData(rawData) : obj.m.ProcessData(arrToStr(rawData));
         }
 
-        // Append to accumulator
+        // Append to accumulator (only used during handshake, not performance-critical KVM path)
+        var newData = (e.data instanceof ArrayBuffer) ? e.data : e.data.buffer;
         if (obj.acc == null) {
-            obj.acc = e.data;
+            obj.acc = newData;
         } else {
-            var tmp = new Uint8Array(obj.acc.byteLength + e.data.byteLength);
+            var tmp = new Uint8Array(obj.acc.byteLength + newData.byteLength);
             tmp.set(new Uint8Array(obj.acc), 0);
-            tmp.set(new Uint8Array(e.data), obj.acc.byteLength);
+            tmp.set(new Uint8Array(newData), obj.acc.byteLength);
             obj.acc = tmp.buffer;
         }
 
-        //console.log('Redir Recv', obj.acc);
         while ((obj.acc != null) && (obj.acc.byteLength >= 1)) {
             var cmdsize = 0, accArray = new Uint8Array(obj.acc);
             switch (accArray[0]) {

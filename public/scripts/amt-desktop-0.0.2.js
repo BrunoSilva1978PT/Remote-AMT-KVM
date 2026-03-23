@@ -14,6 +14,7 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
     obj.protocol = 2; // KVM
     obj.state = 0;
     obj.acc = null;
+    obj.accoff = 0; // Offset into accumulator for zero-copy consumption
     obj.ScreenWidth = 960;
     obj.ScreenHeight = 700;
     obj.width = 0;
@@ -77,7 +78,6 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
     }
 
     function arrToStr(arr) { return String.fromCharCode.apply(null, arr); }
-    function strToArr(str) { var arr = new Uint8Array(str.length); for (var i = 0, j = str.length; i < j; ++i) { arr[i] = str.charCodeAt(i); } return arr }
 
     obj.ProcessBinaryData = function (data) {
         // ###BEGIN###{DesktopRecorder}
@@ -85,36 +85,37 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
         if ((obj.recordedData != null) && (obj.recordedHolding !== true)) { obj.recordedData.push(recordingEntry(2, 1, String.fromCharCode.apply(null, new Uint8Array(data)))); }
         // ###END###{DesktopRecorder}
 
-        // Append to accumulator
+        // Append to accumulator - optimized to reduce copies
         if (obj.acc == null) {
             obj.acc = new Uint8Array(data);
+            obj.accoff = 0;
         } else {
-            var tmp = new Uint8Array(obj.acc.byteLength + data.byteLength);
-            tmp.set(obj.acc, 0);
-            tmp.set(new Uint8Array(data), obj.acc.byteLength);
+            var remaining = obj.acc.byteLength - obj.accoff;
+            var tmp = new Uint8Array(remaining + data.byteLength);
+            tmp.set(new Uint8Array(obj.acc.buffer, obj.accoff, remaining), 0);
+            tmp.set(new Uint8Array(data), remaining);
             obj.acc = tmp;
+            obj.accoff = 0;
         }
 
-        while ((obj.acc != null) && (obj.acc.byteLength > 0)) {
-            //console.log('KAcc', obj.state, obj.acc);
-            var cmdsize = 0, accview = new DataView(obj.acc.buffer);
-            if ((obj.state == 0) && (obj.acc.byteLength >= 12)) {
+        while (obj.acc != null) {
+            var avail = obj.acc.byteLength - obj.accoff;
+            if (avail <= 0) { obj.acc = null; obj.accoff = 0; break; }
+            var cmdsize = 0, accview = new DataView(obj.acc.buffer, obj.accoff, avail);
+            if ((obj.state == 0) && (avail >= 12)) {
                 // Getting handshake & version
                 cmdsize = 12;
-                //if (obj.acc.substring(0, 4) != 'RFB ') { return obj.Stop(); }
-                //var version = parseFloat(obj.acc.substring(4, 11));
-                //console.log('KVersion: ' + version);
                 obj.state = 1;
                 if (obj.parent) { delete obj.parent.connectTime; }
                 obj.send('RFB 003.008\n');
             }
-            else if ((obj.state == 1) && (obj.acc.byteLength >= 1)) {
+            else if ((obj.state == 1) && (avail >= 1)) {
                 // Getting security options
-                cmdsize = obj.acc[0] + 1;
+                cmdsize = obj.acc[obj.accoff] + 1;
                 obj.send(String.fromCharCode(1)); // Send the 'None' security type. Since we already authenticated using redirection digest auth, we don't need to do this again.
                 obj.state = 2;
             }
-            else if ((obj.state == 2) && (obj.acc.byteLength >= 4)) {
+            else if ((obj.state == 2) && (avail >= 4)) {
                 // Getting security response
                 cmdsize = 4;
                 if (accview.getUint32(0) != 0) { return obj.Stop(); }
@@ -122,20 +123,20 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                 obj.state = 3;
                 if (obj.parent) { obj.parent.disconnectCode = 50000; } // If Intel AMT disconnects at exactly this moment, indicates we need RLE8 or unsupported GPU.
             }
-            else if ((obj.state == 3) && (obj.acc.byteLength >= 24)) {
+            else if ((obj.state == 3) && (avail >= 24)) {
                 // Getting server init
                 // ###BEGIN###{DesktopRotation}
                 obj.rotation = 0; // We don't currently support screen init while rotated.
                 // ###END###{DesktopRotation}
                 var namelen = accview.getUint32(20);
-                if (obj.acc.byteLength < 24 + namelen) return;
+                if (avail < 24 + namelen) return;
                 cmdsize = 24 + namelen;
                 obj.canvas.canvas.width = obj.rwidth = obj.width = obj.ScreenWidth = accview.getUint16(0);
                 obj.canvas.canvas.height = obj.rheight = obj.height = obj.ScreenHeight = accview.getUint16(2);
                 //console.log('Initial Desktop width: ' + obj.width + ', height: ' + obj.height);
 
                 // ###BEGIN###{DesktopRecorder}
-                obj.DeskRecordServerInit = String.fromCharCode.apply(null, new Uint8Array(obj.acc.buffer.slice(0, 24 + namelen)));
+                obj.DeskRecordServerInit = String.fromCharCode.apply(null, new Uint8Array(obj.acc.buffer, obj.accoff, 24 + namelen));
                 // ###END###{DesktopRecorder}
 
                 // These are all values we don't really need, we are going to only run in RGB565 or RGB332 and not use the flexibility provided by these settings.
@@ -217,15 +218,15 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                 }
             }
             else if (obj.state == 4) {
-                switch (obj.acc[0]) {
+                switch (obj.acc[obj.accoff]) {
                     case 0: // FramebufferUpdate
-                        if (obj.acc.byteLength < 4) return;
+                        if (avail < 4) return;
                         obj.state = 100 + accview.getUint16(2); // Read the number of tiles that are going to be sent, add 100 and use that as our protocol state.
                         cmdsize = 4;
 
                         // ###BEGIN###{DesktopRecorder}
                         // This is the start of a new frame, start recording now if needed.
-                        if (obj.recordedHolding === true) { delete obj.recordedHolding; obj.recordedData.push(recordingEntry(2, 1, String.fromCharCode.apply(null, obj.acc))); }
+                        if (obj.recordedHolding === true) { delete obj.recordedHolding; obj.recordedData.push(recordingEntry(2, 1, String.fromCharCode.apply(null, new Uint8Array(obj.acc.buffer, obj.accoff, avail)))); }
                         // ###END###{DesktopRecorder}
 
                         break;
@@ -233,14 +234,14 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                         cmdsize = 1;
                         break;
                     case 3: // This is ServerCutText
-                        if (obj.acc.byteLength < 8) return;
+                        if (avail < 8) return;
                         var len = accview.getUint32(4) + 8;
-                        if (obj.acc.byteLength < len) return;
-                        cmdsize = handleServerCutText(obj.acc, accview);
+                        if (avail < len) return;
+                        cmdsize = handleServerCutText(new Uint8Array(obj.acc.buffer, obj.accoff, avail), accview);
                         break;
                 }
             }
-            else if ((obj.state > 100) && (obj.acc.byteLength >= 12)) {
+            else if ((obj.state > 100) && (avail >= 12)) {
                 var x = accview.getUint16(0),
                     y = accview.getUint16(2),
                     width = accview.getUint16(4),
@@ -262,8 +263,9 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                         obj.spare = obj.sparecache[xspacecachename];
                         if (!obj.spare) {
                             obj.sparecache[xspacecachename] = obj.spare = obj.canvas.createImageData(obj.sparew2, obj.spareh2);
-                            var j = (obj.sparew2 * obj.spareh2) << 2;
-                            for (var i = 3; i < j; i += 4) { obj.spare.data[i] = 0xFF; } // Set alpha channel to opaque.
+                            // Use Uint32Array fill for alpha channel - much faster than per-byte loop
+                            var u32 = new Uint32Array(obj.spare.data.buffer);
+                            for (var i = 0, len = u32.length; i < len; i++) { u32[i] = 0xFF000000; }
                         }
                     }
                 }
@@ -283,34 +285,58 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                 } else if (encoding == 0) {
                     // RAW encoding
                     var ptr = 12, cs = 12 + (s * obj.bpp);
-                    if (obj.acc.byteLength < cs) return; // Check we have all the data needed and we can only draw 64x64 tiles.
+                    if (avail < cs) return; // Check we have all the data needed and we can only draw 64x64 tiles.
                     cmdsize = cs;
 
-                    // CRITICAL LOOP, optimize this as much as possible
-                    if (obj.bpp == 2) {
-                        for (var i = 0; i < s; i++) { _setPixel16(accview.getUint16(ptr, true), i); ptr += 2; }
+                    // CRITICAL LOOP - inlined pixel operations, no per-pixel function calls
+                    var sd = obj.spare.data, absptr = obj.accoff + ptr;
+                    if (obj.rotation == 0) {
+                        // Fast path: no rotation - direct buffer write
+                        if (obj.bpp == 2) {
+                            for (var i = 0, pp = 0; i < s; i++, pp += 4, absptr += 2) {
+                                var v = obj.acc[absptr] | (obj.acc[absptr + 1] << 8);
+                                sd[pp] = (v >> 8) & 248; sd[pp + 1] = (v >> 3) & 252; sd[pp + 2] = (v & 31) << 3;
+                            }
+                        } else if (obj.graymode) {
+                            for (var i = 0, pp = 0; i < s; i++, pp += 4) {
+                                var v = obj.acc[absptr++]; if (obj.lowcolor) { v = v << 4; }
+                                sd[pp] = sd[pp + 1] = sd[pp + 2] = v;
+                            }
+                        } else {
+                            for (var i = 0, pp = 0; i < s; i++, pp += 4) {
+                                var v = obj.acc[absptr++];
+                                sd[pp] = v & 224; sd[pp + 1] = (v & 28) << 3; sd[pp + 2] = _fixColor((v & 3) << 6);
+                            }
+                        }
                     } else {
-                        for (var i = 0; i < s; i++) { _setPixel8(obj.acc[ptr++], i); }
+                        // Rotation path - use per-pixel functions
+                        if (obj.bpp == 2) {
+                            for (var i = 0; i < s; i++, absptr += 2) { _setPixel16(obj.acc[absptr] | (obj.acc[absptr + 1] << 8), i); }
+                        } else {
+                            for (var i = 0; i < s; i++) { _setPixel8(obj.acc[obj.accoff + ptr + i], i); }
+                        }
                     }
                     _putImage(obj.spare, x, y);
                 } else if (encoding == 16) {
                     // RLE encoding
-                    if (obj.acc.byteLength < 16) return;
+                    if (avail < 16) return;
                     var datalen = accview.getUint32(12);
-                    if (obj.acc.byteLength < (16 + datalen)) return;
+                    if (avail < (16 + datalen)) return;
 
                     // Process the ZLib header if this is the first block
                     var ptr = 16, delta = 5, dx = 0;
+                    var absptr = obj.accoff + ptr;
 
-                    if ((datalen > 5) && (obj.acc[ptr] == 0) && (accview.getUint16(ptr + 1, true) == (datalen - delta))) {
+                    if ((datalen > 5) && (obj.acc[absptr] == 0) && ((obj.acc[absptr + 1] | (obj.acc[absptr + 2] << 8)) == (datalen - delta))) {
                         // This is an uncompressed ZLib data block
-                        _decodeLRE(obj.acc, ptr + 5, x, y, width, height, s, datalen);
+                        _decodeLRE(obj.acc, absptr + 5, x, y, width, height, s, datalen);
                     }
                     // ###BEGIN###{Inflate}
                     else {
-                        // This is compressed ZLib data, decompress and process it. (TODO: This need to be optimized, remove str/arr conversions)
-                        var str = obj.inflate.inflate(arrToStr(new Uint8Array(obj.acc.buffer.slice(ptr, ptr + datalen - dx))));
-                        if (str.length > 0) { _decodeLRE(strToArr(str), 0, x, y, width, height, s, str.length); } else { console.log('Invalid deflate data'); }
+                        // Compressed ZLib data - use binary inflate (no string conversions)
+                        var compressedData = arrToStr(new Uint8Array(obj.acc.buffer, absptr, datalen - dx));
+                        var inflatedArr = obj.inflate.inflateBinary(compressedData);
+                        if (inflatedArr.length > 0) { _decodeLRE(inflatedArr, 0, x, y, width, height, s, inflatedArr.length); } else { console.log('Invalid deflate data'); }
                     }
                     // ###END###{Inflate}
 
@@ -326,20 +352,40 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                 }
             }
 
-            //console.log('cmdsize', cmdsize);
             if (cmdsize == 0) return;
-            if (cmdsize != obj.acc.byteLength) { obj.acc = new Uint8Array(obj.acc.buffer.slice(cmdsize)); } else { obj.acc = null; }
+            obj.accoff += cmdsize;
+            // Compact only when wasted space > 64KB to avoid frequent copies
+            if (obj.accoff > 65536) {
+                var remaining = obj.acc.byteLength - obj.accoff;
+                if (remaining > 0) {
+                    var tmp = new Uint8Array(remaining);
+                    tmp.set(new Uint8Array(obj.acc.buffer, obj.accoff, remaining));
+                    obj.acc = tmp;
+                } else { obj.acc = null; }
+                obj.accoff = 0;
+            } else if (obj.accoff >= obj.acc.byteLength) { obj.acc = null; obj.accoff = 0; }
         }
     }
 
     function _decodeLRE(data, ptr, x, y, width, height, s, datalen) {
         var subencoding = data[ptr++], index, v, runlengthdecode, palette = {}, rlecount = 0, runlength = 0, i;
         if (subencoding == 0) {
-            // RAW encoding
-            if (obj.bpp == 2) {
-                for (i = 0; i < s; i++) { _setPixel16(data[ptr++] + (data[ptr++] << 8), i); }
+            // RAW encoding - inlined for no-rotation fast path
+            var sd = obj.spare.data;
+            if (obj.rotation == 0) {
+                if (obj.bpp == 2) {
+                    for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++] + (data[ptr++] << 8); sd[pp] = (v >> 8) & 248; sd[pp + 1] = (v >> 3) & 252; sd[pp + 2] = (v & 31) << 3; }
+                } else if (obj.graymode) {
+                    for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++]; if (obj.lowcolor) { v = v << 4; } sd[pp] = sd[pp + 1] = sd[pp + 2] = v; }
+                } else {
+                    for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++]; sd[pp] = v & 224; sd[pp + 1] = (v & 28) << 3; sd[pp + 2] = _fixColor((v & 3) << 6); }
+                }
             } else {
-                for (i = 0; i < s; i++) { _setPixel8(data[ptr++], i); }
+                if (obj.bpp == 2) {
+                    for (i = 0; i < s; i++) { _setPixel16(data[ptr++] + (data[ptr++] << 8), i); }
+                } else {
+                    for (i = 0; i < s; i++) { _setPixel8(data[ptr++], i); }
+                }
             }
             _putImage(obj.spare, x, y);
         }
@@ -364,15 +410,39 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
         }
         else if (subencoding > 1 && subencoding < 17) { // Packed palette encoded tile
             // Read the palette
-            var br = 4, bm = 15; // br is BitRead and bm is BitMask. By adjusting these two we can support all the variations in this encoding.
+            var br = 4, bm = 15, sd = obj.spare.data;
             if (obj.bpp == 2) {
                 for (i = 0; i < subencoding; i++) { palette[i] = data[ptr++] + (data[ptr++] << 8); }
-                if (subencoding == 2) { br = 1; bm = 1; } else if (subencoding <= 4) { br = 2; bm = 3; } // Compute bits to read & bit mark
-                while (rlecount < s && ptr < data.byteLength) { v = data[ptr++]; for (i = (8 - br); i >= 0; i -= br) { _setPixel16(palette[(v >> i) & bm], rlecount++); } } // Display all the bits
+                if (subencoding == 2) { br = 1; bm = 1; } else if (subencoding <= 4) { br = 2; bm = 3; }
+                if (obj.rotation == 0) {
+                    // Fast path: inline pixel writes
+                    while (rlecount < s && ptr < data.byteLength) {
+                        v = data[ptr++];
+                        for (i = (8 - br); i >= 0 && rlecount < s; i -= br) {
+                            var cv = palette[(v >> i) & bm], pp = rlecount << 2;
+                            sd[pp] = (cv >> 8) & 248; sd[pp + 1] = (cv >> 3) & 252; sd[pp + 2] = (cv & 31) << 3;
+                            rlecount++;
+                        }
+                    }
+                } else {
+                    while (rlecount < s && ptr < data.byteLength) { v = data[ptr++]; for (i = (8 - br); i >= 0; i -= br) { _setPixel16(palette[(v >> i) & bm], rlecount++); } }
+                }
             } else {
                 for (i = 0; i < subencoding; i++) { palette[i] = data[ptr++]; }
-                if (subencoding == 2) { br = 1; bm = 1; } else if (subencoding <= 4) { br = 2; bm = 3; } // Compute bits to read & bit mark
-                while (rlecount < s && ptr < data.byteLength) { v = data[ptr++]; for (i = (8 - br); i >= 0; i -= br) { _setPixel8(palette[(v >> i) & bm], rlecount++); } } // Display all the bits
+                if (subencoding == 2) { br = 1; bm = 1; } else if (subencoding <= 4) { br = 2; bm = 3; }
+                if (obj.rotation == 0) {
+                    while (rlecount < s && ptr < data.byteLength) {
+                        v = data[ptr++];
+                        for (i = (8 - br); i >= 0 && rlecount < s; i -= br) {
+                            var cv = palette[(v >> i) & bm], pp = rlecount << 2;
+                            if (obj.graymode) { if (obj.lowcolor) { cv = cv << 4; } sd[pp] = sd[pp + 1] = sd[pp + 2] = cv; }
+                            else { sd[pp] = cv & 224; sd[pp + 1] = (cv & 28) << 3; sd[pp + 2] = _fixColor((cv & 3) << 6); }
+                            rlecount++;
+                        }
+                    }
+                } else {
+                    while (rlecount < s && ptr < data.byteLength) { v = data[ptr++]; for (i = (8 - br); i >= 0; i -= br) { _setPixel8(palette[(v >> i) & bm], rlecount++); } }
+                }
             }
             _putImage(obj.spare, x, y);
         }
@@ -650,6 +720,7 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
     obj.Start = function () {
         obj.state = 0;
         obj.acc = null;
+        obj.accoff = 0;
         // ###BEGIN###{Inflate}
         obj.inflate.inflateReset();
         // ###END###{Inflate}
@@ -815,7 +886,7 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
         if (acc.byteLength < len) return 0;
         // ###BEGIN###{DesktopInband}
         if (obj.onKvmData != null) {
-            var d = arrToStr(new Uint8Array(acc.buffer.slice(8, len)));
+            var d = arrToStr(new Uint8Array(acc.buffer, acc.byteOffset + 8, len - 8));
             if ((d.length >= 16) && (d.substring(0, 15) == '\0KvmDataChannel')) {
                 if (obj.kvmDataSupported == false) { obj.kvmDataSupported = true; /*console.log('KVM Data Channel Supported.');*/ }
                 if (((obj.onKvmDataAck == -1) && (d.length == 16)) || (d.charCodeAt(15) != 0)) { obj.onKvmDataAck = true; }
