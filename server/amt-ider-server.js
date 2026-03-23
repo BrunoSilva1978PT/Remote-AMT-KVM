@@ -428,8 +428,8 @@ module.exports.CreateServerIder = function () {
             }
         }
 
-        // Disk read with synchronous fs.readSync (no FileReader overhead)
-        var g_readQueue = [], g_dev, g_lba, g_len, g_media = null, g_reset = false;
+        // Disk read - burst mode: read all data at once, send all chunks in tight loop
+        var g_readQueue = [], g_media = null, g_reset = false;
 
         function sendDiskData(dev, lba, len, featureRegister) {
             var media = (dev === 0xA0) ? obj.floppy : obj.cdrom;
@@ -444,33 +444,39 @@ module.exports.CreateServerIder = function () {
                 g_readQueue.push({ media: media, dev: dev, lba: lba, len: len, fr: featureRegister });
             } else {
                 g_media = media;
-                g_dev = dev;
-                g_lba = lba;
-                g_len = len;
-                sendDiskDataEx(featureRegister);
+                sendDiskDataBurst(media, dev, lba, len, featureRegister);
             }
         }
 
-        function sendDiskDataEx(featureRegister) {
-            var len = g_len, lba = g_lba;
-            if (g_len > obj.iderinfo.readbfr) { len = obj.iderinfo.readbfr; }
-            g_len -= len;
-            g_lba += len;
+        function sendDiskDataBurst(media, dev, lba, totalLen, featureRegister) {
+            // Read ALL data for this SCSI READ in one shot
+            var buffer = Buffer.alloc(totalLen);
+            fs.read(media.fd, buffer, 0, totalLen, lba, function (error, bytesRead, buffer) {
+                if (g_reset) { g_media = null; sendCommand(0x47); g_readQueue = []; g_reset = false; return; }
 
-            // Async read like MeshCentral - callback fires immediately from OS cache
-            var buffer = Buffer.alloc(len);
-            fs.read(g_media.fd, buffer, 0, len, lba, function (error, bytesRead, buffer) {
-                sendDataToHostBuf(g_dev, (g_len === 0), buffer, featureRegister & 1);
-                if ((g_len > 0) && !g_reset) {
-                    sendDiskDataEx(featureRegister);
-                } else {
-                    g_media = null;
-                    if (g_reset) { sendCommand(0x47); g_readQueue = []; g_reset = false; }
-                    else if (g_readQueue.length > 0) {
-                        var op = g_readQueue.shift();
-                        g_media = op.media; g_dev = op.dev; g_lba = op.lba; g_len = op.len;
-                        sendDiskDataEx(op.fr);
-                    }
+                var readbfr = obj.iderinfo.readbfr;
+                var offset = 0;
+
+                // Cork socket to batch all chunks into fewer TCP segments
+                if (obj.socket && obj.socket.cork) obj.socket.cork();
+
+                while (offset < totalLen) {
+                    var chunkLen = Math.min(readbfr, totalLen - offset);
+                    var isLast = (offset + chunkLen >= totalLen);
+                    var chunk = buffer.slice(offset, offset + chunkLen);
+                    sendDataToHostBuf(dev, isLast, chunk, featureRegister & 1);
+                    offset += chunkLen;
+                }
+
+                // Uncork to flush all chunks at once
+                if (obj.socket && obj.socket.uncork) obj.socket.uncork();
+
+                // Process queue
+                g_media = null;
+                if (g_readQueue.length > 0) {
+                    var op = g_readQueue.shift();
+                    g_media = op.media;
+                    sendDiskDataBurst(op.media, op.dev, op.lba, op.len, op.fr);
                 }
             });
         }
