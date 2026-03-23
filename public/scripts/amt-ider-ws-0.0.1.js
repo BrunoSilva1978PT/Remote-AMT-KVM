@@ -524,6 +524,7 @@ var CreateAmtRemoteIder = function () {
         var mediaBlocks = 0;
         if (dev == 0xA0) { media = obj.floppy; if (obj.floppy != null) { mediaBlocks = (obj.floppy.size >> 9); } }
         if (dev == 0xB0) { media = obj.cdrom; if (obj.cdrom != null) { mediaBlocks = (obj.cdrom.size >> 11); } }
+        if (media == null) { obj.SendCommandEndResponse(1, 0x02, dev, 0x3a, 0x00); return 0; } // No medium present
         if ((len < 0) || (lba + len > mediaBlocks)) { obj.SendCommandEndResponse(1, 0x05, dev, 0x21, 0x00); return 0; }
         if (len == 0) { obj.SendCommandEndResponse(1, 0x00, dev, 0x00, 0x00); return 0; }
         if (media != null) {
