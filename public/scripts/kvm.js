@@ -447,7 +447,10 @@ function showOcrResult(text, copied) {
 
 // ========== IDE-R (Virtual Media) ==========
 
-function mountIderImage() {
+var iderMountMode = 'cdrom'; // 'usb' or 'cdrom'
+
+function mountIderImage(mode) {
+    iderMountMode = mode || 'cdrom';
     Q('iderFileInput').click();
 }
 
@@ -456,16 +459,15 @@ function onIderFileSelected(e) {
     if (!file) return;
     e.target.value = ''; // Reset so same file can be re-selected
 
-    // USB-R (AMT v11+): mount ISO on floppy/disk channel (0xA0) for USB 2.0 speed
-    //   - ISO appears as USB disk (sdX) with 512-byte sectors, no CD-ROM speed cap
-    //   - Dummy blob on cdrom channel (0xB0) prevents sr0 kernel I/O errors
-    // IDE-R (AMT <11): mount ISO on cdrom channel (0xB0) as traditional IDE CD-ROM
-    if (currentcomputer && currentcomputer['usbr']) {
+    if (iderMountMode === 'usb') {
+        // USB disk mode: ISO on floppy/disk channel (0xA0) - appears as sdX, no CD-ROM speed cap
+        // Dummy blob on cdrom channel (0xB0) prevents sr0 kernel I/O errors
         ider.m.floppy = file;
         ider.m.cdrom = new Blob([new ArrayBuffer(2048)], { type: 'application/octet-stream' });
         ider.m.cdrom.name = 'dummy.iso';
         ider.m.cdrom.size = 2048;
     } else {
+        // CD-ROM mode: ISO on cdrom channel (0xB0) - traditional IDE-R/USB-R CD-ROM
         ider.m.cdrom = file;
         ider.m.floppy = null;
     }
@@ -498,10 +500,11 @@ function onIderStateChange(obj, state) {
 function updateIderUI() {
     var iderEnabled = amtfeatures[2]; // IDER/USB-R feature enabled in AMT
     var connected = (ider && ider.State == 3);
-    var hasMedia = (ider && ider.m && (ider.m.cdrom || ider.m.floppy));
+    var hasMedia = (ider && ider.m && ((ider.m.cdrom && ider.m.cdrom.size > 2048) || ider.m.floppy));
 
-    // Hide mount button when IDER/USB-R is not enabled in AMT
-    QV('iderMountBtn', iderEnabled);
+    // Hide mount buttons when IDER/USB-R is not enabled in AMT
+    QV('iderMountUsbBtn', iderEnabled && !connected);
+    QV('iderMountCdBtn', iderEnabled && !connected);
     QV('iderEjectBtn', connected && iderEnabled);
 
     if (!iderEnabled) {
@@ -510,18 +513,15 @@ function updateIderUI() {
     }
 
     if (connected && hasMedia) {
-        var isUsbR = (currentcomputer && currentcomputer['usbr']);
-        var name = isUsbR ? (ider.m.floppy ? ider.m.floppy.name : '') : (ider.m.cdrom ? ider.m.cdrom.name : '');
-        if (!name && ider.m.floppy) name = ider.m.floppy.name;
-        if (!name && ider.m.cdrom) name = ider.m.cdrom.name;
-        var modeLabel = isUsbR ? ' (USB-R)' : ' (IDE-R)';
+        var name = '';
+        if (iderMountMode === 'usb' && ider.m.floppy) { name = ider.m.floppy.name; }
+        else if (ider.m.cdrom && ider.m.cdrom.size > 2048) { name = ider.m.cdrom.name; }
+        else if (ider.m.floppy) { name = ider.m.floppy.name; }
+        var modeLabel = (iderMountMode === 'usb') ? ' (USB)' : ' (CD-ROM)';
         Q('iderStatus').textContent = '💿 ' + name + modeLabel;
-        Q('iderMountBtn').value = '💿 Change ISO';
     } else if (ider && ider.State > 0) {
         Q('iderStatus').textContent = 'Connecting...';
-        Q('iderMountBtn').value = '💿 Mount ISO';
     } else {
         Q('iderStatus').textContent = '';
-        Q('iderMountBtn').value = '💿 Mount ISO';
     }
 }
