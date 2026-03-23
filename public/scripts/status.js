@@ -153,6 +153,7 @@ function updateSystemStatus() {
         if (redir) features += ", Redirection Port"; if (sol) features += ", Serial-over-LAN"; if (ider) features += (amtversion >= 11) ? ", USB-Redirect" : ", IDE-Redirect"; if (kvm) features += ", KVM";
         if (features == '') features = '  None';
         x += TableEntry("Active Features", addLinkConditional(features.substring(2), 'showFeaturesDlg()', xxAccountAdminName));
+        updateIderUI(); // Update mount button visibility based on IDER/USB-R feature state
     }
     if (amtsysstate['IPS_KVMRedirectionSettingData'] != null && amtsysstate['IPS_KVMRedirectionSettingData'].response) {
         var ds = amtsysstate['IPS_KVMRedirectionSettingData'].response;

@@ -496,9 +496,19 @@ function onIderStateChange(obj, state) {
 }
 
 function updateIderUI() {
+    var iderEnabled = amtfeatures[2]; // IDER/USB-R feature enabled in AMT
     var connected = (ider && ider.State == 3);
     var hasMedia = (ider && ider.m && (ider.m.cdrom || ider.m.floppy));
-    QV('iderEjectBtn', connected);
+
+    // Hide mount button when IDER/USB-R is not enabled in AMT
+    QV('iderMountBtn', iderEnabled);
+    QV('iderEjectBtn', connected && iderEnabled);
+
+    if (!iderEnabled) {
+        Q('iderStatus').textContent = '';
+        return;
+    }
+
     if (connected && hasMedia) {
         var isUsbR = (currentcomputer && currentcomputer['usbr']);
         var name = isUsbR ? (ider.m.floppy ? ider.m.floppy.name : '') : (ider.m.cdrom ? ider.m.cdrom.name : '');
