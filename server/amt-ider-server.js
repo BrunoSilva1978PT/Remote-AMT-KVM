@@ -125,7 +125,7 @@ module.exports.CreateServerIder = function () {
                 if (obj.authState < 3) {
                     len = processAuth();
                 } else {
-                    len = processIderData();
+                    len = processIderDataWrapper();
                     // Check sequence number for ALL IDER messages (bytes 4-7)
                     if (len > 0 && obj.acc.length >= 8) {
                         var seq = ReadIntX(obj.acc, 4);
@@ -208,12 +208,24 @@ module.exports.CreateServerIder = function () {
             g_reset = false;
 
             // Send OPEN_SESSION
-            sendCommand(0x40, ShortToStrX(obj.rx_timeout) + ShortToStrX(obj.tx_timeout) + ShortToStrX(obj.heartbeat) + IntToStrX(obj.version));
+            var openCmd = ShortToStrX(obj.rx_timeout) + ShortToStrX(obj.tx_timeout) + ShortToStrX(obj.heartbeat) + IntToStrX(obj.version);
+            console.log('IDER-Server: Sending OPEN_SESSION, data length=' + openCmd.length);
+            sendCommand(0x40, openCmd);
 
             // Keepalive ping every 5 seconds
             obj.pingTimer = setInterval(function () { sendCommand(0x44); }, 5000);
 
             if (opts.onStatus) opts.onStatus('ider_started');
+        }
+
+        function processIderDataWrapper() {
+            if (obj.acc.length < 8) return 0;
+            var cmd = obj.acc.charCodeAt(0);
+            var len = processIderData();
+            if (len > 0) {
+                console.log('IDER-Server: Recv cmd=0x' + cmd.toString(16) + ' len=' + len + ' seq=' + (obj.inSequence - 1));
+            }
+            return len;
         }
 
         // IDER protocol processing (same logic as client-side but with fs.readSync)
@@ -446,7 +458,9 @@ module.exports.CreateServerIder = function () {
         // Protocol send functions
         function sendRaw(x) {
             if (obj.socket) {
-                obj.socket.write(Buffer.from(x, 'binary'));
+                var buf = Buffer.from(x, 'binary');
+                console.log('IDER-Server: Send ' + buf.length + ' bytes, cmd=0x' + buf[0].toString(16));
+                obj.socket.write(buf);
                 obj.bytesToAmt += x.length;
             }
         }
