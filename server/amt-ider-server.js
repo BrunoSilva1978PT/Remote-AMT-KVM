@@ -70,15 +70,22 @@ module.exports.CreateServerIder = function () {
         obj.authState = 0;
         obj.opts = opts;
 
-        // Open the ISO file as CD-ROM, create tiny dummy floppy to silence sdd errors
+        // Open the ISO file on the chosen channel, create dummy for the other to silence kernel errors
         try {
             var stats = fs.statSync(opts.isoPath);
-            obj.cdrom = { size: stats.size, fd: fs.openSync(opts.isoPath, 'r') };
-            // Dummy floppy: 512 bytes of zeros - prevents kernel I/O error spam on sdd
-            var dummyPath = require('path').join(require('os').tmpdir(), 'ider-dummy-floppy.img');
-            var dummyBuf = Buffer.alloc(512);
-            fs.writeFileSync(dummyPath, dummyBuf);
-            obj.floppy = { size: 512, fd: fs.openSync(dummyPath, 'r'), dummy: false };
+            var dummyPath = require('path').join(require('os').tmpdir(), 'ider-dummy.img');
+
+            if (opts.mountMode === 'usb') {
+                // USB mode: ISO on floppy/disk channel (0xA0), dummy on cdrom (0xB0)
+                obj.floppy = { size: stats.size, fd: fs.openSync(opts.isoPath, 'r') };
+                fs.writeFileSync(dummyPath, Buffer.alloc(2048));
+                obj.cdrom = { size: 2048, fd: fs.openSync(dummyPath, 'r') };
+            } else {
+                // CD-ROM mode: ISO on cdrom channel (0xB0), dummy on floppy (0xA0)
+                obj.cdrom = { size: stats.size, fd: fs.openSync(opts.isoPath, 'r') };
+                fs.writeFileSync(dummyPath, Buffer.alloc(512));
+                obj.floppy = { size: 512, fd: fs.openSync(dummyPath, 'r') };
+            }
         } catch (e) {
             if (opts.onError) opts.onError('Cannot open file: ' + e.message);
             return null;
