@@ -263,6 +263,21 @@ var CreateAmtRemoteIder = function () {
         var lba;
         var len;
 
+        // If the device channel has no media, reject all commands with NOT READY / NO MEDIUM
+        // This prevents the OS from retrying reads on an empty channel (e.g. sr0 in USB-R mode)
+        var hasMedia = (dev == 0xA0) ? (obj.floppy != null) : (obj.cdrom != null);
+        if (!hasMedia) {
+            var cmd = cdb.charCodeAt(0);
+            if (cmd == 0x00) { // TEST_UNIT_READY - always respond (required for device detection)
+                obj.SendCommandEndResponse(1, 0x02, dev, 0x3a, 0x00);
+            } else if (cmd == 0x03) { // REQUEST_SENSE - return no medium sense data
+                obj.SendDataToHost(dev, true, String.fromCharCode(0x70, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x3A, 0x00, 0x00, 0x00, 0x00, 0x00), featureRegister & 1);
+            } else {
+                obj.SendCommandEndResponse(1, 0x02, dev, 0x3a, 0x00); // NOT READY, MEDIUM NOT PRESENT
+            }
+            return -1;
+        }
+
         switch(cdb.charCodeAt(0))
         {
             case 0x00: // TEST_UNIT_READY:
