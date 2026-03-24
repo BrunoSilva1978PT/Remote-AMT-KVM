@@ -709,12 +709,22 @@ function center() {
         var marginLeft = (aw - sw) / 2;
         QS('Desk')['margin-left'] = marginLeft + 'px'; QS('Desk')['margin-right'] = marginLeft + 'px';
     } else {
-        QS('Desk')['max-height'] = (mh - sh) + 'px';
-        QS('Desk')['max-width'] = (Q('id_mainarea').offsetWidth - 32) + 'px';
-        if (Q('id_DeskParent').offsetWidth != 0) QS('Desk')['max-width'] = Q('id_DeskParent').offsetWidth;
-        QS('id_mainarea_pad')['overflow-y'] = 'scroll';
+        // Scale canvas to fill available area while maintaining aspect ratio
+        var aw = Q('id_DeskParent').offsetWidth || (Q('id_mainarea').offsetWidth - 32);
+        var ah = mh - sh;
+        var desk = Q('Desk'), cw = desk.width, ch = desk.height;
+        if (cw > 0 && ch > 0 && aw > 0 && ah > 0) {
+            var scale = Math.min(aw / cw, ah / ch);
+            var sw = Math.round(cw * scale), sh2 = Math.round(ch * scale);
+            QS('Desk')['max-height'] = ''; QS('Desk')['max-width'] = '';
+            QS('Desk').width = sw + 'px'; QS('Desk').height = sh2 + 'px';
+        } else {
+            QS('Desk')['max-height'] = ah + 'px';
+            QS('Desk')['max-width'] = aw + 'px';
+            QS('Desk').width = ''; QS('Desk').height = '';
+        }
+        QS('id_mainarea_pad')['overflow-y'] = 'hidden';
         QS('Desk')['margin-top'] = '0'; QS('Desk')['margin-bottom'] = '0';
-        QS('Desk').width = ''; QS('Desk').height = '';
         QS('Desk')['margin-left'] = '0px'; QS('Desk')['margin-right'] = '';
     }
 }
