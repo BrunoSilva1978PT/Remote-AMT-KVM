@@ -263,8 +263,11 @@ function powerActionTimeout() {
 
 function powerActionBootToSource(bootSourceInstanceID, bootSettings, powerState) {
     var timer = powerActionTimeout();
-    // Build a clean AMT_BootSettingData object with only writable fields
+    // Build AMT_BootSettingData object with key fields + writable fields
     var fullSettings = {
+        'InstanceID': 'Intel(r) AMT: Boot Configuration 0',
+        'ElementName': 'Intel(r) AMT: Boot Configuration 0',
+        'OwningEntity': 'Intel(r) AMT',
         'BIOSPause': false, 'BIOSSetup': false, 'BootMediaIndex': 0,
         'ConfigurationDataReset': false, 'FirmwareVerbosity': 0,
         'ForcedProgressEvents': false, 'IDERBootDevice': 0,
