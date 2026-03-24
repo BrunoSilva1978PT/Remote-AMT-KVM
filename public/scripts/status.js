@@ -331,7 +331,7 @@ function powerActionDlg() {
         var isFloppy = (action == 200 || action == 202);
         var isReset = (action == 200 || action == 201);
         var bootInstanceID = isFloppy ? 'Intel(r) AMT: Force Floppy/LS120 Boot' : 'Intel(r) AMT: Force CD/DVD Boot';
-        powerActionBootToSource(bootInstanceID, { UseIDER: true }, isReset ? 10 : 2);
+        powerActionBootToSource(bootInstanceID, { UseIDER: true, UseSOL: true, IDERBootDevice: isFloppy ? 0 : 1 }, isReset ? 10 : 2);
     } else if (action == 400 || action == 401) {
         // Boot to PXE
         powerActionBootToSource('Intel(r) AMT: Force PXE Boot', {}, (action == 400) ? 10 : 2);
