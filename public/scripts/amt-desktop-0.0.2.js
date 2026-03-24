@@ -235,6 +235,10 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                         obj.state = 100 + accview.getUint16(2); // Read the number of tiles that are going to be sent, add 100 and use that as our protocol state.
                         cmdsize = 4;
 
+                        // Pipeline: request next frame NOW so the server captures while we render.
+                        // This overlaps server capture time with client processing, nearly doubling FPS.
+                        if (obj.frameRateDelay == 0) { _SendRefresh(); }
+
                         // ###BEGIN###{DesktopRecorder}
                         // This is the start of a new frame, start recording now if needed.
                         if (obj.recordedHolding === true) { delete obj.recordedHolding; obj.recordedData.push(recordingEntry(2, 1, String.fromCharCode.apply(null, new Uint8Array(obj.acc.buffer, obj.accoff, avail)))); }
@@ -343,10 +347,10 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                 } else { return obj.Stop(); }
                 if (--obj.state == 100) {
                     obj.state = 4;
-                    if (obj.frameRateDelay == 0) {
-                        _SendRefresh(); // Ask for new frame
-                    } else {
-                        setTimeout(_SendRefresh, obj.frameRateDelay); // Hold x miliseconds before asking for a new frame
+                    // Frame request was already pipelined at start of frame processing.
+                    // Only send here if frame rate limiting is active (delay > 0).
+                    if (obj.frameRateDelay > 0) {
+                        setTimeout(_SendRefresh, obj.frameRateDelay);
                     }
                 }
             }
