@@ -263,35 +263,37 @@ function powerActionTimeout() {
 
 function powerActionBootToSource(bootSourceInstanceID, bootSettings, powerState) {
     var timer = powerActionTimeout();
-    // Build AMT_BootSettingData object with key fields + writable fields
-    var fullSettings = {
-        'InstanceID': 'Intel(r) AMT: Boot Configuration 0',
-        'ElementName': 'Intel(r) AMT: Boot Configuration 0',
-        'OwningEntity': 'Intel(r) AMT',
-        'BIOSPause': false, 'BIOSSetup': false, 'BootMediaIndex': 0,
-        'ConfigurationDataReset': false, 'FirmwareVerbosity': 0,
-        'ForcedProgressEvents': false, 'IDERBootDevice': 0,
-        'LockKeyboard': false, 'LockPowerButton': false,
-        'LockResetButton': false, 'LockSleepButton': false,
-        'ReflashBIOS': false, 'UseIDER': false, 'UseSOL': false,
-        'UserPasswordBypass': false, 'SecureErase': false
-    };
-    // Apply requested boot settings
-    for (var k in bootSettings) { if (bootSettings.hasOwnProperty(k)) { fullSettings[k] = bootSettings[k]; } }
-    amtstack.SetBootConfigRole(1, function (stack, name, response, status) {
-        if (status !== 200) { clearTimeout(timer); powerActionResult(false, "SetBootConfigRole failed (error " + status + ")."); return; }
-        var sourceXml = bootSourceInstanceID ? '<Address xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2004/08/addressing</Address><ReferenceParameters xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing"><ResourceURI xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_BootSourceSetting</ResourceURI><SelectorSet xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"><Selector Name="InstanceID">' + bootSourceInstanceID + '</Selector></SelectorSet></ReferenceParameters>' : null;
-        amtstack.CIM_BootConfigSetting_ChangeBootOrder(sourceXml, function (stack, name, response, status) {
-            if (status !== 200) { clearTimeout(timer); powerActionResult(false, "ChangeBootOrder failed (error " + status + ")."); return; }
-            amtstack.Put('AMT_BootSettingData', fullSettings, function (stack, name, response, status) {
-                if (status !== 200) { clearTimeout(timer); powerActionResult(false, "Put BootSettingData failed (error " + status + ")."); return; }
-                amtstack.RequestPowerStateChange(powerState, function (stack, name, response, status) {
-                    clearTimeout(timer);
-                    if (status == 200) { powerActionResult(true); } else { powerActionResult(false, "RequestPowerStateChange failed (error " + status + ")."); }
+    // Follow MeshCentral's approach: GET full BootSettingData, delete read-only fields, modify, PUT back
+    amtstack.Get('AMT_BootSettingData', function (stack, name, response, status) {
+        if (status !== 200) { clearTimeout(timer); powerActionResult(false, "Get BootSettingData failed (error " + status + ")."); return; }
+        var bsd = response.Body;
+        // Delete read-only and version-specific fields that AMT rejects on PUT (same as MeshCentral)
+        delete bsd['WinREBootEnabled']; delete bsd['UEFILocalPBABootEnabled'];
+        delete bsd['UEFIHTTPSBootEnabled']; delete bsd['SecureBootControlEnabled'];
+        delete bsd['BootguardStatus']; delete bsd['OptionsCleared'];
+        delete bsd['BIOSLastStatus']; delete bsd['PlatformErase'];
+        delete bsd['RPEEnabled']; delete bsd['RSEPassword'];
+        // Reset boot flags and apply requested settings
+        bsd['ConfigurationDataReset'] = false;
+        bsd['BIOSPause'] = false; bsd['BIOSSetup'] = false;
+        bsd['UseIDER'] = false; bsd['UseSOL'] = false;
+        for (var k in bootSettings) { if (bootSettings.hasOwnProperty(k)) { bsd[k] = bootSettings[k]; } }
+        // PUT cleaned settings, then set boot config role, change boot order, and power action
+        amtstack.Put('AMT_BootSettingData', bsd, function (stack, name, response, status) {
+            if (status !== 200) { clearTimeout(timer); powerActionResult(false, "Put BootSettingData failed (error " + status + ")."); return; }
+            amtstack.SetBootConfigRole(1, function (stack, name, response, status) {
+                if (status !== 200) { clearTimeout(timer); powerActionResult(false, "SetBootConfigRole failed (error " + status + ")."); return; }
+                var sourceXml = bootSourceInstanceID ? '<Address xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2004/08/addressing</Address><ReferenceParameters xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing"><ResourceURI xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_BootSourceSetting</ResourceURI><SelectorSet xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"><Selector Name="InstanceID">' + bootSourceInstanceID + '</Selector></SelectorSet></ReferenceParameters>' : null;
+                amtstack.CIM_BootConfigSetting_ChangeBootOrder(sourceXml, function (stack, name, response, status) {
+                    if (status !== 200) { clearTimeout(timer); powerActionResult(false, "ChangeBootOrder failed (error " + status + ")."); return; }
+                    amtstack.RequestPowerStateChange(powerState, function (stack, name, response, status) {
+                        clearTimeout(timer);
+                        if (status == 200) { powerActionResult(true); } else { powerActionResult(false, "RequestPowerStateChange failed (error " + status + ")."); }
+                    });
                 });
-            }, 0, 1);
-        });
-    });
+            });
+        }, 0, 1);
+    }, 0, 1);
 }
 
 function powerActionDlg() {
