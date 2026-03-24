@@ -262,8 +262,17 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
 
                 if (encoding == 0xFFFFFF21) {
                     // Desktop Size (0xFFFFFF21, -223)
+                    // Preserve current canvas content before resize (setting canvas.width clears the buffer)
+                    var oldW = obj.canvas.canvas.width, oldH = obj.canvas.canvas.height;
+                    if (oldW > 0 && oldH > 0 && (oldW !== width || oldH !== height)) {
+                        var tmp = document.createElement('canvas');
+                        tmp.width = oldW; tmp.height = oldH;
+                        tmp.getContext('2d').drawImage(obj.canvas.canvas, 0, 0);
+                    }
                     obj.canvas.canvas.width = obj.rwidth = obj.width = width;
                     obj.canvas.canvas.height = obj.rheight = obj.height = height;
+                    // Restore old content scaled to new size to avoid flash
+                    if (tmp) { obj.canvas.drawImage(tmp, 0, 0, width, height); tmp = null; }
                     obj.send(String.fromCharCode(3, 0, 0, 0, 0, 0) + ShortToStr(obj.width) + ShortToStr(obj.height)); // FramebufferUpdateRequest
                     cmdsize = 12;
                     if (obj.onScreenSizeChange != null) { obj.onScreenSizeChange(obj, obj.ScreenWidth, obj.ScreenHeight); }
