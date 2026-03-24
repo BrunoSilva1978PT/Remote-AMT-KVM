@@ -715,8 +715,14 @@ function center() {
         QS('Desk')['margin-left'] = marginLeft + 'px'; QS('Desk')['margin-right'] = marginLeft + 'px';
     } else {
         // Scale canvas to fill available area while maintaining aspect ratio
+        // Subtract height of UI elements around the canvas (header, toolbars, padding)
+        var uiH = 0;
+        var rdH = Q('id_rdheader'); if (rdH && rdH.style.display !== 'none') uiH += rdH.offsetHeight;
+        var topBar = Q('id_kvmTopBar'); if (topBar && topBar.style.display !== 'none') uiH += topBar.offsetHeight;
+        var botBar = Q('id_kvmBottomBar'); if (botBar && botBar.style.display !== 'none') uiH += botBar.offsetHeight;
+        uiH += 16; // padding of id_mainarea_pad (8px top + 8px bottom)
         var aw = Q('id_DeskParent').offsetWidth || (Q('id_mainarea').offsetWidth - 32);
-        var ah = mh - sh;
+        var ah = Q('id_mainarea').offsetHeight - warningH - uiH;
         var desk = Q('Desk'), cw = desk.width, ch = desk.height;
         if (cw > 0 && ch > 0 && aw > 0 && ah > 0) {
             var scale = Math.min(aw / cw, ah / ch);
