@@ -34,10 +34,6 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
     obj.sparecache = {};
     obj.onScreenSizeChange = null;
     obj.frameRateDelay = 0;
-    // ###BEGIN###{DesktopRotation}
-    obj.noMouseRotate = false;
-    obj.rotation = 0;
-    // ###END###{DesktopRotation}
     // ###BEGIN###{DesktopInband}
     obj.kvmDataSupported = false;
     obj.onKvmData = null;
@@ -125,9 +121,6 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
             }
             else if ((obj.state == 3) && (avail >= 24)) {
                 // Getting server init
-                // ###BEGIN###{DesktopRotation}
-                obj.rotation = 0; // We don't currently support screen init while rotated.
-                // ###END###{DesktopRotation}
                 var namelen = accview.getUint32(20);
                 if (avail < 24 + namelen) return;
                 cmdsize = 24 + namelen;
@@ -256,9 +249,6 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                     if ((obj.sparew != width) || (obj.spareh != height)) {
                         obj.sparew = obj.sparew2 = width;
                         obj.spareh = obj.spareh2 = height;
-                        // ###BEGIN###{DesktopRotation}
-                        if (obj.rotation == 1 || obj.rotation == 3) { obj.sparew2 = height, obj.spareh2 = width; }
-                        // ###END###{DesktopRotation}
                         var xspacecachename = obj.sparew2 + 'x' + obj.spareh2;
                         obj.spare = obj.sparecache[xspacecachename];
                         if (!obj.spare) {
@@ -290,30 +280,20 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
 
                     // CRITICAL LOOP - inlined pixel operations, no per-pixel function calls
                     var sd = obj.spare.data, absptr = obj.accoff + ptr;
-                    if (obj.rotation == 0) {
-                        // Fast path: no rotation - direct buffer write
-                        if (obj.bpp == 2) {
-                            for (var i = 0, pp = 0; i < s; i++, pp += 4, absptr += 2) {
-                                var v = obj.acc[absptr] | (obj.acc[absptr + 1] << 8);
-                                sd[pp] = (v >> 8) & 248; sd[pp + 1] = (v >> 3) & 252; sd[pp + 2] = (v & 31) << 3;
-                            }
-                        } else if (obj.graymode) {
-                            for (var i = 0, pp = 0; i < s; i++, pp += 4) {
-                                var v = obj.acc[absptr++]; if (obj.lowcolor) { v = v << 4; }
-                                sd[pp] = sd[pp + 1] = sd[pp + 2] = v;
-                            }
-                        } else {
-                            for (var i = 0, pp = 0; i < s; i++, pp += 4) {
-                                var v = obj.acc[absptr++];
-                                sd[pp] = v & 224; sd[pp + 1] = (v & 28) << 3; sd[pp + 2] = _fixColor((v & 3) << 6);
-                            }
+                    if (obj.bpp == 2) {
+                        for (var i = 0, pp = 0; i < s; i++, pp += 4, absptr += 2) {
+                            var v = obj.acc[absptr] | (obj.acc[absptr + 1] << 8);
+                            sd[pp] = (v >> 8) & 248; sd[pp + 1] = (v >> 3) & 252; sd[pp + 2] = (v & 31) << 3;
+                        }
+                    } else if (obj.graymode) {
+                        for (var i = 0, pp = 0; i < s; i++, pp += 4) {
+                            var v = obj.acc[absptr++]; if (obj.lowcolor) { v = v << 4; }
+                            sd[pp] = sd[pp + 1] = sd[pp + 2] = v;
                         }
                     } else {
-                        // Rotation path - use per-pixel functions
-                        if (obj.bpp == 2) {
-                            for (var i = 0; i < s; i++, absptr += 2) { _setPixel16(obj.acc[absptr] | (obj.acc[absptr + 1] << 8), i); }
-                        } else {
-                            for (var i = 0; i < s; i++) { _setPixel8(obj.acc[obj.accoff + ptr + i], i); }
+                        for (var i = 0, pp = 0; i < s; i++, pp += 4) {
+                            var v = obj.acc[absptr++];
+                            sd[pp] = v & 224; sd[pp + 1] = (v & 28) << 3; sd[pp + 2] = _fixColor((v & 3) << 6);
                         }
                     }
                     _putImage(obj.spare, x, y);
@@ -370,22 +350,14 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
     function _decodeLRE(data, ptr, x, y, width, height, s, datalen) {
         var subencoding = data[ptr++], index, v, runlengthdecode, palette = {}, rlecount = 0, runlength = 0, i;
         if (subencoding == 0) {
-            // RAW encoding - inlined for no-rotation fast path
+            // RAW encoding
             var sd = obj.spare.data;
-            if (obj.rotation == 0) {
-                if (obj.bpp == 2) {
-                    for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++] + (data[ptr++] << 8); sd[pp] = (v >> 8) & 248; sd[pp + 1] = (v >> 3) & 252; sd[pp + 2] = (v & 31) << 3; }
-                } else if (obj.graymode) {
-                    for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++]; if (obj.lowcolor) { v = v << 4; } sd[pp] = sd[pp + 1] = sd[pp + 2] = v; }
-                } else {
-                    for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++]; sd[pp] = v & 224; sd[pp + 1] = (v & 28) << 3; sd[pp + 2] = _fixColor((v & 3) << 6); }
-                }
+            if (obj.bpp == 2) {
+                for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++] + (data[ptr++] << 8); sd[pp] = (v >> 8) & 248; sd[pp + 1] = (v >> 3) & 252; sd[pp + 2] = (v & 31) << 3; }
+            } else if (obj.graymode) {
+                for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++]; if (obj.lowcolor) { v = v << 4; } sd[pp] = sd[pp + 1] = sd[pp + 2] = v; }
             } else {
-                if (obj.bpp == 2) {
-                    for (i = 0; i < s; i++) { _setPixel16(data[ptr++] + (data[ptr++] << 8), i); }
-                } else {
-                    for (i = 0; i < s; i++) { _setPixel8(data[ptr++], i); }
-                }
+                for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++]; sd[pp] = v & 224; sd[pp + 1] = (v & 28) << 3; sd[pp + 2] = _fixColor((v & 3) << 6); }
             }
             _putImage(obj.spare, x, y);
         }
@@ -400,12 +372,6 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                 obj.canvas.fillStyle = 'rgb(' + ((obj.bpp == 1) ? ((v & 224) + ',' + ((v & 28) << 3) + ',' + _fixColor((v & 3) << 6)) : (((v >> 8) & 248) + ',' + ((v >> 3) & 252) + ',' + ((v & 31) << 3))) + ')';
             }
 
-            // ###BEGIN###{DesktopRotation}
-            var xx = _rotX(x, y);
-            y = _rotY(x, y);
-            x = xx;
-            // ###END###{DesktopRotation}
-
             obj.canvas.fillRect(x, y, width, height);
         }
         else if (subencoding > 1 && subencoding < 17) { // Packed palette encoded tile
@@ -414,34 +380,25 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
             if (obj.bpp == 2) {
                 for (i = 0; i < subencoding; i++) { palette[i] = data[ptr++] + (data[ptr++] << 8); }
                 if (subencoding == 2) { br = 1; bm = 1; } else if (subencoding <= 4) { br = 2; bm = 3; }
-                if (obj.rotation == 0) {
-                    // Fast path: inline pixel writes
-                    while (rlecount < s && ptr < data.byteLength) {
-                        v = data[ptr++];
-                        for (i = (8 - br); i >= 0 && rlecount < s; i -= br) {
-                            var cv = palette[(v >> i) & bm], pp = rlecount << 2;
-                            sd[pp] = (cv >> 8) & 248; sd[pp + 1] = (cv >> 3) & 252; sd[pp + 2] = (cv & 31) << 3;
-                            rlecount++;
-                        }
+                while (rlecount < s && ptr < data.byteLength) {
+                    v = data[ptr++];
+                    for (i = (8 - br); i >= 0 && rlecount < s; i -= br) {
+                        var cv = palette[(v >> i) & bm], pp = rlecount << 2;
+                        sd[pp] = (cv >> 8) & 248; sd[pp + 1] = (cv >> 3) & 252; sd[pp + 2] = (cv & 31) << 3;
+                        rlecount++;
                     }
-                } else {
-                    while (rlecount < s && ptr < data.byteLength) { v = data[ptr++]; for (i = (8 - br); i >= 0; i -= br) { _setPixel16(palette[(v >> i) & bm], rlecount++); } }
                 }
             } else {
                 for (i = 0; i < subencoding; i++) { palette[i] = data[ptr++]; }
                 if (subencoding == 2) { br = 1; bm = 1; } else if (subencoding <= 4) { br = 2; bm = 3; }
-                if (obj.rotation == 0) {
-                    while (rlecount < s && ptr < data.byteLength) {
-                        v = data[ptr++];
-                        for (i = (8 - br); i >= 0 && rlecount < s; i -= br) {
-                            var cv = palette[(v >> i) & bm], pp = rlecount << 2;
-                            if (obj.graymode) { if (obj.lowcolor) { cv = cv << 4; } sd[pp] = sd[pp + 1] = sd[pp + 2] = cv; }
-                            else { sd[pp] = cv & 224; sd[pp + 1] = (cv & 28) << 3; sd[pp + 2] = _fixColor((cv & 3) << 6); }
-                            rlecount++;
-                        }
+                while (rlecount < s && ptr < data.byteLength) {
+                    v = data[ptr++];
+                    for (i = (8 - br); i >= 0 && rlecount < s; i -= br) {
+                        var cv = palette[(v >> i) & bm], pp = rlecount << 2;
+                        if (obj.graymode) { if (obj.lowcolor) { cv = cv << 4; } sd[pp] = sd[pp + 1] = sd[pp + 2] = cv; }
+                        else { sd[pp] = cv & 224; sd[pp + 1] = (cv & 28) << 3; sd[pp + 2] = _fixColor((cv & 3) << 6); }
+                        rlecount++;
                     }
-                } else {
-                    while (rlecount < s && ptr < data.byteLength) { v = data[ptr++]; for (i = (8 - br); i >= 0; i -= br) { _setPixel8(palette[(v >> i) & bm], rlecount++); } }
                 }
             }
             _putImage(obj.spare, x, y);
@@ -456,11 +413,7 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                     runlength = 1; do { runlength += (runlengthdecode = data[ptr++]); } while (runlengthdecode == 255);
 
                     // Draw a run
-                    if (obj.rotation == 0) {
-                        _setPixel16run(v, rlecount, runlength); rlecount += runlength;
-                    } else {
-                        while (--runlength >= 0) { _setPixel16(v, rlecount++); }
-                    }
+                    _setPixel16run(v, rlecount, runlength); rlecount += runlength;
                 }
             } else {
                 while (rlecount < s && ptr < data.byteLength) {
@@ -471,11 +424,7 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                     runlength = 1; do { runlength += (runlengthdecode = data[ptr++]); } while (runlengthdecode == 255);
 
                     // Draw a run
-                    if (obj.rotation == 0) {
-                        _setPixel8run(v, rlecount, runlength); rlecount += runlength;
-                    } else {
-                        while (--runlength >= 0) { _setPixel8(v, rlecount++); }
-                    }
+                    _setPixel8run(v, rlecount, runlength); rlecount += runlength;
                 }
             }
             _putImage(obj.spare, x, y);
@@ -497,18 +446,10 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                 if (index > 127) { do { runlength += (runlengthdecode = data[ptr++]); } while (runlengthdecode == 255); }
 
                 // Draw a run
-                if (obj.rotation == 0) {
-                    if (obj.bpp == 2) {
-                        _setPixel16run(v, rlecount, runlength); rlecount += runlength;
-                    } else {
-                        _setPixel8run(v, rlecount, runlength); rlecount += runlength;
-                    }
+                if (obj.bpp == 2) {
+                    _setPixel16run(v, rlecount, runlength); rlecount += runlength;
                 } else {
-                    if (obj.bpp == 2) {
-                        while (--runlength >= 0) { _setPixel16(v, rlecount++); }
-                    } else {
-                        while (--runlength >= 0) { _setPixel8(v, rlecount++); }
-                    }
+                    _setPixel8run(v, rlecount, runlength); rlecount += runlength;
                 }
             }
             _putImage(obj.spare, x, y);
@@ -540,51 +481,7 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
         // ###BEGIN###{DesktopInband}
         if (obj.holding == true) return;
         // ###END###{DesktopInband}
-        // ###BEGIN###{DesktopRotation}
-        var xx = _arotX(x, y);
-        y = _arotY(x, y);
-        x = xx;
-        // ###END###{DesktopRotation}
         obj.canvas.putImageData(i, x, y);
-    }
-
-    // Set 8bit color RGB332
-    function _setPixel8(v, p) {
-        var pp = p << 2;
-
-        // ###BEGIN###{DesktopRotation}
-        if (obj.rotation > 0) {
-            if (obj.rotation == 1) { var x = p % obj.sparew, y = Math.floor(p / obj.sparew); p = (x * obj.sparew2) + (obj.sparew2 - 1 - y); pp = p << 2; }
-            else if (obj.rotation == 2) { pp = (obj.sparew * obj.spareh * 4) - 4 - pp; }
-            else if (obj.rotation == 3) { var x = p % obj.sparew, y = Math.floor(p / obj.sparew); p = ((obj.sparew2 - 1 - x) * obj.sparew2) + (y); pp = p << 2; }
-        }
-        // ###END###{DesktopRotation}
-
-        if (obj.graymode) {
-            if (obj.lowcolor) { v = v << 4; }
-            obj.spare.data[pp] = obj.spare.data[pp + 1] = obj.spare.data[pp + 2] = v;
-        } else {
-            obj.spare.data[pp] = v & 224;
-            obj.spare.data[pp + 1] = (v & 28) << 3;
-            obj.spare.data[pp + 2] = _fixColor((v & 3) << 6);
-        }
-    }
-
-    // Set 16bit color RGB565
-    function _setPixel16(v, p) {
-        var pp = p << 2;
-
-        // ###BEGIN###{DesktopRotation}
-        if (obj.rotation > 0) {
-            if (obj.rotation == 1) { var x = p % obj.sparew, y = Math.floor(p / obj.sparew); p = (x * obj.sparew2) + (obj.sparew2 - 1 - y); pp = p << 2; }
-            else if (obj.rotation == 2) { pp = (obj.sparew * obj.spareh * 4) - 4 - pp; }
-            else if (obj.rotation == 3) { var x = p % obj.sparew, y = Math.floor(p / obj.sparew); p = ((obj.sparew2 - 1 - x) * obj.sparew2) + (y); pp = p << 2; }
-        }
-        // ###END###{DesktopRotation}
-
-        obj.spare.data[pp] = (v >> 8) & 248;
-        obj.spare.data[pp + 1] = (v >> 3) & 252;
-        obj.spare.data[pp + 2] = (v & 31) << 3;
     }
 
     // Set a run of 8bit color RGB332
@@ -604,96 +501,6 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
         var pp = (p << 2), r = ((v >> 8) & 248), g = ((v >> 3) & 252), b = ((v & 31) << 3);
         while (--run >= 0) { obj.spare.data[pp] = r; obj.spare.data[pp + 1] = g; obj.spare.data[pp + 2] = b; pp += 4; }
     }
-
-    // ###BEGIN###{DesktopRotation}
-    function _arotX(x, y) {
-        if (obj.rotation == 0) return x;
-        if (obj.rotation == 1) return obj.canvas.canvas.width - obj.sparew2 - y;
-        if (obj.rotation == 2) return obj.canvas.canvas.width - obj.sparew2 - x;
-        if (obj.rotation == 3) return y;
-        return 0;
-    }
-
-    function _arotY(x, y) {
-        if (obj.rotation == 0) return y;
-        if (obj.rotation == 1) return x;
-        if (obj.rotation == 2) return obj.canvas.canvas.height - obj.spareh2 - y;
-        if (obj.rotation == 3) return obj.canvas.canvas.height - obj.spareh - x;
-        return 0;
-    }
-
-    function _crotX(x, y) {
-        if (obj.rotation == 0) return x;
-        if (obj.rotation == 1) return y;
-        if (obj.rotation == 2) return obj.canvas.canvas.width - x;
-        if (obj.rotation == 3) return obj.canvas.canvas.height - y;
-        return 0;
-    }
-
-    function _crotY(x, y) {
-        if (obj.rotation == 0) return y;
-        if (obj.rotation == 1) return obj.canvas.canvas.width - x;
-        if (obj.rotation == 2) return obj.canvas.canvas.height - y;
-        if (obj.rotation == 3) return x;
-        return 0;
-    }
-
-    function _rotX(x, y) {
-        if (obj.rotation == 0) return x;
-        if (obj.rotation == 1) return x;
-        if (obj.rotation == 2) return x - obj.canvas.canvas.width;
-        if (obj.rotation == 3) return x - obj.canvas.canvas.height;
-        return 0;
-    }
-
-    function _rotY(x, y) {
-        if (obj.rotation == 0) return y;
-        if (obj.rotation == 1) return y - obj.canvas.canvas.width;
-        if (obj.rotation == 2) return y - obj.canvas.canvas.height;
-        if (obj.rotation == 3) return y;
-        return 0;
-    }
-
-    obj.tcanvas = null;
-    obj.setRotation = function (x) {
-        while (x < 0) { x += 4; }
-        var newrotation = x % 4;
-        //console.log('hard-rot: ' + newrotation);
-        // ###BEGIN###{DesktopInband}
-        if (obj.holding == true) { obj.rotation = newrotation; return; }
-        // ###END###{DesktopInband}
-
-        if (newrotation == obj.rotation) return true;
-        var rw = obj.canvas.canvas.width;
-        var rh = obj.canvas.canvas.height;
-        if (obj.rotation == 1 || obj.rotation == 3) { rw = obj.canvas.canvas.height; rh = obj.canvas.canvas.width; }
-
-        // Copy the canvas, put it back in the correct direction
-        if (obj.tcanvas == null) obj.tcanvas = document.createElement('canvas');
-        var tcanvasctx = obj.tcanvas.getContext('2d');
-        tcanvasctx.setTransform(1, 0, 0, 1, 0, 0);
-        tcanvasctx.canvas.width = rw;
-        tcanvasctx.canvas.height = rh;
-        tcanvasctx.rotate((obj.rotation * -90) * Math.PI / 180);
-        if (obj.rotation == 0) tcanvasctx.drawImage(obj.canvas.canvas, 0, 0);
-        if (obj.rotation == 1) tcanvasctx.drawImage(obj.canvas.canvas, -obj.canvas.canvas.width, 0);
-        if (obj.rotation == 2) tcanvasctx.drawImage(obj.canvas.canvas, -obj.canvas.canvas.width, -obj.canvas.canvas.height);
-        if (obj.rotation == 3) tcanvasctx.drawImage(obj.canvas.canvas, 0, -obj.canvas.canvas.height);
-
-        // Change the size and orientation and copy the canvas back into the rotation
-        if (obj.rotation == 0 || obj.rotation == 2) { obj.canvas.canvas.height = rw; obj.canvas.canvas.width = rh; }
-        if (obj.rotation == 1 || obj.rotation == 3) { obj.canvas.canvas.height = rh; obj.canvas.canvas.width = rw; }
-        obj.canvas.setTransform(1, 0, 0, 1, 0, 0);
-        obj.canvas.rotate((newrotation * 90) * Math.PI / 180);
-        obj.rotation = newrotation;
-        obj.canvas.drawImage(obj.tcanvas, _rotX(0, 0), _rotY(0, 0));
-
-        obj.width = obj.canvas.canvas.width;
-        obj.height = obj.canvas.canvas.height;
-        if (obj.onScreenResize != null) obj.onScreenResize(obj, obj.width, obj.height, obj.CanvasId);
-        return true;
-    }
-    // ###END###{DesktopRotation}
 
     function _fixColor(c) { return (c > 127) ? (c + 32) : c; }
 
@@ -1024,18 +831,6 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
         obj.my = ((event.pageY - Offsets[1]) * ScaleFactorHeight);
         if (event.addx) { obj.mx += event.addx; }
         if (event.addy) { obj.my += event.addy; }
-
-        // ###BEGIN###{DesktopRotation}
-        if ((obj.rotation == 1) || (obj.rotation == 3)) {
-            obj.mx = ((obj.mx * obj.rwidth) / obj.width);
-            obj.my = ((obj.my * obj.rheight) / obj.height);
-        }
-        if (obj.noMouseRotate != true) {
-            var mx2 = _crotX(obj.mx, obj.my);
-            obj.my = _crotY(obj.mx, obj.my);
-            obj.mx = mx2;
-        }
-        // ###END###{DesktopRotation}
 
         // This is the mouse motion nagle timer. Slow down the mouse motion event rate.
         if (force == 1) {

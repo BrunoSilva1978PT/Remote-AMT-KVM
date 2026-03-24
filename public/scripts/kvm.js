@@ -20,7 +20,6 @@ function connectDesktop(skipConsent) {
         desktop.digestRealmMatch = amtstack.wsman.comm.digestRealm;
         if ((amtversion > 15) || urlvars['kvmext']) { desktop.m.kvmExtChanged = updateDesktopState; } else { desktop.m.kvmExtChanged = null; }
         desktop.m.frameRateDelay = ((desktopsettings.limitFrameRate == true)?200:0);
-        desktop.m.noMouseRotate = desktopsettings.noMouseRotate;
         desktop.tlsv1only = amtstack.wsman.comm.tlsv1only;
         var ports = portsFromHost(currentcomputer['host'], currentcomputer['tls']);
         if (amtsysstate && amtsysstate['IPS_ScreenConfigurationService'] != null && ((amtsysstate['IPS_ScreenConfigurationService'].response['EnabledState'] & 1) != 0)) {
@@ -104,7 +103,6 @@ function showDesktopSettingsChanged() {
     desktopsettings.showmouse = d7showcursor.checked;
     desktopsettings.showcad = d7showcad.checked;
     desktopsettings.limitFrameRate = d7limitFrameRate.checked;
-    desktopsettings.noMouseRotate = d7noMouseRotate.checked;
     desktopsettings.quality = d7bitmapquality.value;
     desktopsettings.scaling = d7bitmapscaling.value;
     saveSettings();
@@ -120,7 +118,6 @@ function applyDesktopSettings() {
     d7showcursor.checked = desktopsettings.showmouse;
     d7showcad.checked = desktopsettings.showcad;
     d7limitFrameRate.checked = desktopsettings.limitFrameRate;
-    d7noMouseRotate.checked = desktopsettings.noMouseRotate;
     if (desktopsettings.quality) d7bitmapquality.value = desktopsettings.quality;
     if (desktopsettings.scaling) d7bitmapscaling.value = desktopsettings.scaling;
     QV('d7softkvmsettings', amtversion >= 12);
@@ -177,14 +174,13 @@ function dmousedown(e) { if (!xxdialogMode && !Q('id_DeskVO').checked) desktop.m
 function dmouseup(e) { if (!xxdialogMode && !Q('id_DeskVO').checked) desktop.m.mouseup(e); }
 function dmousemove(e) { if (!xxdialogMode && !Q('id_DeskVO').checked) desktop.m.mousemove(e); }
 function dmousewheel(e) { if (!xxdialogMode && !Q('id_DeskVO').checked) desktop.m.mousewheel(e); }
-function drotate(x) { if (xxdialogMode) return; desktop.m.setRotation(desktop.m.rotation + x); center(); }
-
 function deskToggleFull(kvmonly) {
     if (xxdialogMode) return;
     if (fullscreenonly) { fullscreenonly = false; disconnect(); return; }
     fullscreenonly = kvmonly; fullscreen = !fullscreen;
     QV('id_topheader', !fullscreen); QV('id_leftbar', !fullscreen); QV('id_rdheader', !fullscreen);
     QV('idx_deskFullBtn', !fullscreen); QV('idx_deskFullBtn2', fullscreen);
+    QV('id_kvmTopBar', !fullscreen); QV('id_kvmBottomBar', !fullscreen);
     if (fullscreen) {
         QS('id_mainarea').top = 0; QS('id_mainarea').left = 0; QS('id_mainarea_pad').padding = 0;
         if (document.documentElement.requestFullscreen) { document.documentElement.requestFullscreen(); }

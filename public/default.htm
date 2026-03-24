@@ -212,27 +212,25 @@ th:hover { cursor: pointer; background: var(--hover); }
                         <div class="icon2" style="float:left;margin:7px"></div><div style='width:auto;border-radius:8px;padding:8px;background-color:lightsalmon'>Remote computer is not powered on, click here to issue a power command.</div>
                     </div>
                     <table cellpadding="0" cellspacing="0" style="width:100%;padding:0;margin-top:0">
-                        <tr><td style="padding:4px 6px;background:var(--toolbar-bg);border-bottom:1px solid var(--border)">
+                        <tr id="id_kvmTopBar"><td style="padding:4px 6px;background:var(--toolbar-bg);border-bottom:1px solid var(--border)">
                             <div style="float:right;text-align:right">
                                 <span style="font-size:12px;opacity:0.7;margin-right:4px">&#x26A1;</span><span id="id_p14power" style="font-size:12px;opacity:0.7;margin-right:8px"></span>
-                                <div class='rb' title="Rotate Left" onclick="drotate(-1)">&olarr;</div>
-                                <div class='rb' title="Rotate Right" onclick="drotate(1)">&orarr;</div>
                                 <input id="idx_deskFullBtn" type="button" title="Toggle full screen mode" onkeypress="return false" onkeydown="return false" value="⛶ Fullscreen" onclick="deskToggleFull()" style="margin-right:3px">
                                 <input id="idx_deskFocusBtn" type="button" title="Toggle focus mode" onkeypress="return false" onkeydown="return false" value="Focus All" onclick="deskToggleFocus()" style="margin-right:3px">
                                 <input type="button" value="Settings..." title="Edit remote desktop settings" onkeypress="return false" onkeydown="return false" onclick="showDesktopSettings()" style="margin-right:3px">
                                 <input type="button" title="Change the power state" onkeypress="return false" onkeydown="return false" value="Power Actions..." onclick="showPowerActionDlg()" style="margin-right:3px">
                             </div>
                             <div>
-                                <div id="idx_deskFullBtn2" onclick="deskToggleFull()" style="float:left;cursor:pointer;font-size:15px;display:none">&nbsp;&#x2716;</div>
                                 &nbsp;<input type="button" id="idx_connectbutton1" value="Connect" onclick="connectDesktopButton(event)" onkeypress="return false" onkeydown="return false" disabled="disabled">
                                 &nbsp;<span id="id_deskstatus">Disconnected.</span>
                             </div>
                         </td></tr>
                         <tr><td id="id_DeskParent" style="background:black;text-align:center;position:relative">
+                            <div id="idx_deskFullBtn2" onclick="deskToggleFull()" style="display:none;position:absolute;top:8px;left:8px;z-index:100;cursor:pointer;font-size:18px;color:#fff;background:rgba(0,0,0,0.5);border-radius:50%;width:32px;height:32px;line-height:32px;text-align:center" title="Exit fullscreen">&#x2716;</div>
                             <div id="DeskFocus" style="color:transparent;border:3px dotted rgba(255,0,0,.2);position:absolute;border-radius:5px" oncontextmenu="return false" onmousedown="dmousedown(event)" onmouseup="dmouseup(event)" onmousemove="dmousemove(event)"></div>
                             <canvas id="Desk" width="640" height="400" style="-ms-touch-action:none;margin-left:0px" oncontextmenu="return false" onmousedown="dmousedown(event)" onmouseup="dmouseup(event)" onmousemove="dmousemove(event)" onwheel="dmousewheel(event)" moz-opaque=""></canvas>
                         </td></tr>
-                        <tr><td style="padding:4px 6px;background:var(--toolbar-bg);border-top:1px solid var(--border)">
+                        <tr id="id_kvmBottomBar"><td style="padding:4px 6px;background:var(--toolbar-bg);border-top:1px solid var(--border)">
                             <div id="id_DeskRecorderTools" style="float:right;display:flex;gap:4px;align-items:center">
                                 <input id="DeskRecordButton" type="button" value="&#9679; Rec" title="Record remote desktop session to file" onclick="deskRecordSession()" style="font-size:9pt !important;padding:2px 8px !important">
                                 <input id="DeskSaveImageButton" type="button" value="&#128247; Snapshot" title="Save a screenshot" onclick="deskSaveImage()" style="font-size:9pt !important;padding:2px 8px !important">
@@ -323,7 +321,6 @@ th:hover { cursor: pointer; background: var(--hover); }
                         <label><input type="checkbox" id='d7showcursor'>Show Local Mouse Cursor</label><br>
                         <label><input type="checkbox" id='d7showcad'>Show Ctrl-Alt-Del</label><br>
                         <label><input type="checkbox" id='d7limitFrameRate'>Limit Frame Rate</label><br>
-                        <label><input type="checkbox" id='d7noMouseRotate'>Don't Rotate Mouse</label><br>
                     </div>
                 </div>
                 <div id="d7softkvmsettings" style="display:none">

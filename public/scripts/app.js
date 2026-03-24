@@ -26,7 +26,7 @@ var amtstack;
 var wsstack = null;
 var desktop;
 var ider;
-var desktopsettings = { encflags: 1, showfocus: false, showmouse: true, showcad: true, limitFrameRate: false, noMouseRotate: false, decimationMode: 2 };
+var desktopsettings = { encflags: 1, showfocus: false, showmouse: true, showcad: true, limitFrameRate: false, decimationMode: 2 };
 var StatusStrs = ["Disconnected", "Connecting...", "Setup...", "Connected"];
 var currentView = 0;
 var LoadingHtml = '<div style=text-align:center;padding-top:20px>Loading...<div>';
@@ -693,7 +693,7 @@ function dialogclose(x) {
 
 function center() {
     QS('dialog').left = ((((getDocWidth() - 400) / 2)) + 'px');
-    var sh = 0, mh = (Q('id_mainarea').offsetHeight - ((fullscreen == false)?126:53));
+    var sh = 0, mh = (Q('id_mainarea').offsetHeight - ((fullscreen == false)?126:0));
     QS('id_mainarea_pad').height = (Q('id_mainarea').offsetHeight - sh - ((fullscreen == false)?16:0)) + 'px';
     QS('Desk')['max-height'] = (mh - sh) + 'px';
     QS('Desk')['max-width'] = (Q('id_mainarea').offsetWidth - ((fullscreen == false)?32:0)) + 'px';
