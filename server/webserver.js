@@ -183,6 +183,12 @@ module.exports.CreateWebServer = function (args) {
 
             if (!host || !user || !pass || !isoPath) { res.status(400).send(JSON.stringify({ error: 'Missing parameters' })); return; }
 
+            // Validate isoPath: resolve and check it exists (prevent path traversal)
+            try {
+                isoPath = obj.path.resolve(isoPath);
+                if (!obj.fs.existsSync(isoPath)) { res.status(400).send(JSON.stringify({ error: 'File not found' })); return; }
+            } catch (e) { res.status(400).send(JSON.stringify({ error: 'Invalid path' })); return; }
+
             // Stop existing session for this host
             if (obj.activeIderSessions[host]) { obj.activeIderSessions[host].Stop(); delete obj.activeIderSessions[host]; }
 
@@ -230,7 +236,12 @@ module.exports.CreateWebServer = function (args) {
     obj.app.post('/netboot-download.ashx', function (req, res) {
         res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0', 'Content-Type': 'application/json' });
         var url = req.body.url;
-        if (!url || url.indexOf('netboot.xyz') === -1) { res.status(400).send(JSON.stringify({ error: 'Invalid URL' })); return; }
+        try {
+            var parsed = new URL(url);
+            if (parsed.hostname !== 'boot.netboot.xyz' && !parsed.hostname.endsWith('.netboot.xyz')) {
+                res.status(400).send(JSON.stringify({ error: 'Invalid URL: only netboot.xyz domains allowed' })); return;
+            }
+        } catch (e) { res.status(400).send(JSON.stringify({ error: 'Invalid URL' })); return; }
 
         var tmpDir = require('os').tmpdir();
         var filePath = require('path').join(tmpDir, 'netboot.xyz.iso');
@@ -259,6 +270,18 @@ module.exports.CreateWebServer = function (args) {
                     res.status(500).send(JSON.stringify({ error: 'Download failed: HTTP ' + response.statusCode }));
                     return;
                 }
+                // Limit download size to 500MB
+                var maxSize = 500 * 1024 * 1024;
+                var contentLength = parseInt(response.headers['content-length']);
+                if (contentLength && contentLength > maxSize) {
+                    response.resume();
+                    res.status(400).send(JSON.stringify({ error: 'File too large (max 500MB)' }));
+                    return;
+                }
+                file.on('error', function (err) {
+                    try { require('fs').unlink(filePath, function () {}); } catch (e) { }
+                    try { res.status(500).send(JSON.stringify({ error: 'Write error: ' + err.message })); } catch (e) { }
+                });
                 response.pipe(file);
                 file.on('finish', function () { file.close(); res.send(JSON.stringify({ path: filePath, size: file.bytesWritten })); });
             }).on('error', function (err) {
@@ -386,6 +409,7 @@ module.exports.CreateWebServer = function (args) {
             ws.forwardclient.forwardwsocket = ws;
         } else {
             // If TLS is going to be used, setup a TLS socket
+            // rejectUnauthorized: false — AMT devices use self-signed certificates with no CA chain to validate
             var tlsoptions = { minVersion: 'TLSv1', maxVersion: (req.query.tls1only == 1) ? 'TLSv1' : undefined, ciphers: 'RSA+AES:!aNULL:!MD5:!DSS', secureOptions: obj.constants.SSL_OP_NO_SSLv2 | obj.constants.SSL_OP_NO_SSLv3 | obj.constants.SSL_OP_NO_COMPRESSION | obj.constants.SSL_OP_CIPHER_SERVER_PREFERENCE, rejectUnauthorized: false };
             ws.forwardclient = obj.tls.connect(req.query.port, req.query.host, tlsoptions, function () {
                 obj.debug("TLS connected to " + req.query.host + ':' + req.query.port + '.');

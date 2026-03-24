@@ -101,7 +101,7 @@ var CreateAmtRedirect = function (module, authCookie) {
                     var authDataLen = new DataView(obj.acc).getUint32(5, true);
                     if (accArray.byteLength < 9 + authDataLen) return;
                     var status = accArray[1], authType = accArray[4], authData = [];
-                    for (i = 0; i < authDataLen; i++) { authData.push(accArray[9 + i]); }
+                    for (var i = 0; i < authDataLen; i++) { authData.push(accArray[9 + i]); }
                     var authDataBuf = new Uint8Array(obj.acc.slice(9, 9 + authDataLen));
                     cmdsize = 9 + authDataLen;
                     if (authType == 0) {
@@ -248,7 +248,7 @@ var CreateAmtRedirect = function (module, authCookie) {
     obj.xxOnSocketClosed = function () {
         if ((obj.inDataCount == 0) && (obj.tlsv1only == 0)) {
             obj.tlsv1only = 1;
-            obj.socket = new WebSocket(window.location.protocol.replace('http', 'ws') + '//' + window.location.host + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) + '/webrelay.ashx?p=2&host=' + obj.host + '&port=' + obj.port + '&tls=' + obj.tls + '&tls1only=1' + ((obj.user == '*') ? '&serverauth=1' : '') + ((typeof pass === 'undefined') ? ('&serverauth=1&user=' + obj.user) : '')); // The 'p=2' indicates to the relay that this is a REDIRECTION session
+            obj.socket = new WebSocket(window.location.protocol.replace('http', 'ws') + '//' + window.location.host + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) + '/webrelay.ashx?p=2&host=' + obj.host + '&port=' + obj.port + '&tls=' + obj.tls + '&tls1only=1' + ((obj.user == '*') ? '&serverauth=1' : '') + ((typeof obj.pass === 'undefined') ? ('&serverauth=1&user=' + obj.user) : '')); // The 'p=2' indicates to the relay that this is a REDIRECTION session
             obj.socket.binaryType = 'arraybuffer';
             obj.socket.onopen = obj.xxOnSocketConnected;
             obj.socket.onmessage = obj.xxOnMessage;

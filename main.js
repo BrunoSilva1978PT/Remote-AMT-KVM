@@ -39,13 +39,13 @@ function createWindow() {
 
     mainWindow.setMenuBarVisibility(false);
 
-    // Grant clipboard permissions for KVM copy/paste
+    // Grant clipboard permissions for KVM copy/paste, deny other sensitive permissions
+    var allowedPermissions = ['clipboard-read', 'clipboard-sanitized-write'];
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-        callback(true);
+        callback(allowedPermissions.includes(permission));
     });
     session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
-        if (permission === 'clipboard-read' || permission === 'clipboard-sanitized-write') return true;
-        return true;
+        return allowedPermissions.includes(permission);
     });
 
     mainWindow.loadURL('http://127.0.0.1:' + serverPort);

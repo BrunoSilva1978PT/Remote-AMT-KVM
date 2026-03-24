@@ -17,8 +17,9 @@ function processSystemVersion(stack, name, responses, status) {
             v = stack.wsman.comm.amtVersion;
             if (!v) { errcheck(400, stack); return; }
         }
-        amtversion = parseInt(v.split('.')[0]);
-        amtversionmin = parseInt(v.split('.')[1]);
+        var vparts = v.split('.');
+        amtversion = parseInt(vparts[0], 10) || 0;
+        amtversionmin = parseInt(vparts[1], 10) || 0;
         if (stack.wsman.comm.digestRealm && (currentcomputer['digestrealm'] != stack.wsman.comm.digestRealm)) {
             currentcomputer['digestrealm'] = stack.wsman.comm.digestRealm;
             saveComputers(); updateComputerDetails();
@@ -141,14 +142,15 @@ function updateSystemStatus() {
     if (amtsysstate['CIM_ServiceAvailableToElement'] != null && amtsysstate['CIM_ServiceAvailableToElement'].responses != null && amtsysstate['CIM_ServiceAvailableToElement'].responses.length > 0) {
         QV('id_p14warning2', amtsysstate['CIM_ServiceAvailableToElement'].responses[0]['PowerState'] != 2);
     }
-    if (amtsysstate['AMT_RedirectionService'].status == 200) {
+    if (amtsysstate['AMT_RedirectionService'] && amtsysstate['AMT_RedirectionService'].status == 200 && amtsysstate['AMT_RedirectionService'].response) {
         var redir = amtfeatures[0] = (amtsysstate['AMT_RedirectionService'].response['ListenerEnabled'] == true);
         var sol = amtfeatures[1] = ((amtsysstate['AMT_RedirectionService'].response['EnabledState'] & 2) != 0);
         var ider = amtfeatures[2] = ((amtsysstate['AMT_RedirectionService'].response['EnabledState'] & 1) != 0);
         var kvm = amtfeatures[3] = undefined;
-        if ((amtversion > 5) && (amtsysstate['CIM_KVMRedirectionSAP'] != null)) {
+        if ((amtversion > 5) && (amtsysstate['CIM_KVMRedirectionSAP'] != null) && amtsysstate['CIM_KVMRedirectionSAP'].response) {
             QV('go14', true);
-            kvm = amtfeatures[3] = ((amtsysstate['CIM_KVMRedirectionSAP'].response['EnabledState'] == 6 && amtsysstate['CIM_KVMRedirectionSAP'].response['RequestedState'] == 2) || amtsysstate['CIM_KVMRedirectionSAP'].response['EnabledState'] == 2 || amtsysstate['CIM_KVMRedirectionSAP'].response['EnabledState'] == 6);
+            var kvmState = amtsysstate['CIM_KVMRedirectionSAP'].response['EnabledState'];
+            kvm = amtfeatures[3] = (kvmState == 2 || kvmState == 6);
         }
         if (redir) features += ", Redirection Port"; if (sol) features += ", Serial-over-LAN"; if (ider) features += (amtversion >= 11) ? ", USB-Redirect" : ", IDE-Redirect"; if (kvm) features += ", KVM";
         if (features == '') features = '  None';
@@ -159,7 +161,7 @@ function updateSystemStatus() {
         var ds = amtsysstate['IPS_KVMRedirectionSettingData'].response;
         features = "Primary display";
         if (ds['SessionTimeout']) features += ", " + ds['SessionTimeout'] + " minute session timeout";
-        if ((amtversion > 9) && (amtsysstate['IPS_ScreenConfigurationService'] != null)) {
+        if ((amtversion > 9) && (amtsysstate['IPS_ScreenConfigurationService'] != null) && amtsysstate['IPS_ScreenConfigurationService'].response) {
             var sb = ((amtsysstate['IPS_ScreenConfigurationService'].response['EnabledState'] & 1) != 0);
             QV('id_DeskSBspan', sb); Q('id_DeskSB').checked = false;
         } else { QV('id_DeskSBspan', false); }

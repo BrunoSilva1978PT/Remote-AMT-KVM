@@ -74,6 +74,7 @@ module.exports.CreateServerIder = function () {
         try {
             var stats = fs.statSync(opts.isoPath);
             var dummyPath = require('path').join(require('os').tmpdir(), 'ider-dummy.img');
+            obj.dummyPath = dummyPath;
 
             if (opts.mountMode === 'usb') {
                 // USB mode: ISO on floppy/disk channel (0xA0), dummy on cdrom (0xB0)
@@ -99,6 +100,7 @@ module.exports.CreateServerIder = function () {
                 obj.socket.setNoDelay(true);
                 obj.socket.connect(port, opts.host, onConnected);
             } else {
+                // rejectUnauthorized: false — AMT devices use self-signed certificates with no CA chain to validate
                 var tlsoptions = { minVersion: 'TLSv1', ciphers: 'RSA+AES:!aNULL:!MD5:!DSS', rejectUnauthorized: false };
                 obj.socket = tls.connect(port, opts.host, tlsoptions, onConnected);
             }
@@ -232,9 +234,9 @@ module.exports.CreateServerIder = function () {
         function startIder() {
             obj.inSequence = 0;
             obj.outSequence = 0;
-            g_readQueue = [];
-            g_media = null;
-            g_reset = false;
+            obj.readQueue = [];
+            obj.activeMedia = null;
+            obj.resetPending = false;
 
             // Send OPEN_SESSION
             var openCmd = ShortToStrX(obj.rx_timeout) + ShortToStrX(obj.tx_timeout) + ShortToStrX(obj.heartbeat) + IntToStrX(obj.version);
@@ -278,8 +280,8 @@ module.exports.CreateServerIder = function () {
                 case 0x45: return 8; // KEEPALIVEPONG
                 case 0x46: // RESETOCCURED
                     if (obj.acc.length < 9) return 0;
-                    if (g_media === null) { sendCommand(0x47); }
-                    else { g_reset = true; }
+                    if (obj.activeMedia === null) { sendCommand(0x47); }
+                    else { obj.resetPending = true; }
                     return 9;
                 case 0x49: // STATUS_DATA
                     if (obj.acc.length < 13) return 0;
@@ -356,7 +358,7 @@ module.exports.CreateServerIder = function () {
                     break;
                 case 0x25: // READ_CAPACITY
                     var capLen = (dev === 0xA0) ? (media.size >> 9) - 1 : (media.size >> 11) - 1;
-                    sendDataToHost(deviceFlags, true, IntToStr(capLen) + String.fromCharCode(0, 0, (dev === 0xB0) ? 0x08 : 0x02, 0), featureRegister & 1);
+                    sendDataToHost(dev, true, IntToStr(capLen) + String.fromCharCode(0, 0, (dev === 0xB0) ? 0x08 : 0x02, 0), featureRegister & 1);
                     break;
                 case 0x28: // READ_10
                     lba = ReadInt(cdb, 2);
@@ -429,7 +431,9 @@ module.exports.CreateServerIder = function () {
         }
 
         // Disk read - burst mode: read all data at once, send all chunks in tight loop
-        var g_readQueue = [], g_media = null, g_reset = false;
+        obj.readQueue = [];
+        obj.activeMedia = null;
+        obj.resetPending = false;
 
         function sendDiskData(dev, lba, len, featureRegister) {
             var media = (dev === 0xA0) ? obj.floppy : obj.cdrom;
@@ -440,10 +444,10 @@ module.exports.CreateServerIder = function () {
 
             if (dev === 0xA0) { lba <<= 9; len <<= 9; } else { lba <<= 11; len <<= 11; }
 
-            if (g_media !== null) {
-                g_readQueue.push({ media: media, dev: dev, lba: lba, len: len, fr: featureRegister });
+            if (obj.activeMedia !== null) {
+                obj.readQueue.push({ media: media, dev: dev, lba: lba, len: len, fr: featureRegister });
             } else {
-                g_media = media;
+                obj.activeMedia = media;
                 sendDiskDataBurst(media, dev, lba, len, featureRegister);
             }
         }
@@ -452,7 +456,7 @@ module.exports.CreateServerIder = function () {
             // Read ALL data for this SCSI READ in one shot
             var buffer = Buffer.alloc(totalLen);
             fs.read(media.fd, buffer, 0, totalLen, lba, function (error, bytesRead, buffer) {
-                if (g_reset) { g_media = null; sendCommand(0x47); g_readQueue = []; g_reset = false; return; }
+                if (obj.resetPending) { obj.activeMedia = null; sendCommand(0x47); obj.readQueue = []; obj.resetPending = false; return; }
 
                 var readbfr = obj.iderinfo.readbfr;
                 var offset = 0;
@@ -472,10 +476,10 @@ module.exports.CreateServerIder = function () {
                 if (obj.socket && obj.socket.uncork) obj.socket.uncork();
 
                 // Process queue
-                g_media = null;
-                if (g_readQueue.length > 0) {
-                    var op = g_readQueue.shift();
-                    g_media = op.media;
+                obj.activeMedia = null;
+                if (obj.readQueue.length > 0) {
+                    var op = obj.readQueue.shift();
+                    obj.activeMedia = op.media;
                     sendDiskDataBurst(op.media, op.dev, op.lba, op.len, op.fr);
                 }
             });
@@ -552,6 +556,7 @@ module.exports.CreateServerIder = function () {
             if (obj.floppy && obj.floppy.fd) { try { fs.closeSync(obj.floppy.fd); } catch (e) { } }
             if (obj.cdrom && obj.cdrom.fd) { try { fs.closeSync(obj.cdrom.fd); } catch (e) { } }
             if (obj.socket) { try { obj.socket.destroy(); } catch (e) { } obj.socket = null; }
+            if (obj.dummyPath) { try { fs.unlinkSync(obj.dummyPath); } catch (e) { } }
             if (opts.onStatus) opts.onStatus('stopped');
         };
 

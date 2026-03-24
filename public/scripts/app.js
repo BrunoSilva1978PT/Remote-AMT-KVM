@@ -300,7 +300,7 @@ function scanNetwork() {
                 if (exists) {
                     html += '<span style="font-size:11px;color:var(--text-secondary)">Already added</span>';
                 } else {
-                    html += '<input type="button" value="Add" onclick="scanAddComputer(\'' + d.ip + '\',' + d.port + ',' + d.tls + ');this.disabled=true;this.value=\'Added\'">';
+                    html += '<input type="button" value="Add" onclick="scanAddComputer(\'' + d.ip.replace(/'/g, "\\'").replace(/[\\"><]/g, '') + '\',' + parseInt(d.port) + ',' + (d.tls ? 1 : 0) + ');this.disabled=true;this.value=\'Added\'">';
                 }
                 html += '</div>';
             }

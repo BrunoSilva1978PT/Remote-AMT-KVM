@@ -14,7 +14,7 @@ Desktop application for remote management of Intel AMT (Active Management Techno
 - Native fullscreen mode (toggle with ESC)
 - Focus modes: All Focus / Small Focus / Large Focus
 - Local mouse cursor show/hide
-- Blank screen toggle — disable remote display while maintaining control
+- Blank screen toggle — request AMT to blank the remote display while maintaining control (firmware-dependent)
 - View-only mode — read-only access without keyboard/mouse input
 - Session recording to file and snapshot capture (PNG)
 

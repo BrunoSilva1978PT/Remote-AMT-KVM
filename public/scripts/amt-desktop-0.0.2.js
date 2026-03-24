@@ -250,7 +250,9 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                         break;
                     case 3: // This is ServerCutText
                         if (avail < 8) return;
-                        var len = accview.getUint32(4) + 8;
+                        var rawLen = accview.getUint32(4);
+                        if (rawLen > 0x7FFFFFFF) return; // Overflow protection
+                        var len = rawLen + 8;
                         if (avail < len) return;
                         cmdsize = handleServerCutText(new Uint8Array(obj.acc.buffer, obj.accoff, avail), accview);
                         break;
