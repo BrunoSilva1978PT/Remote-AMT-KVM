@@ -693,11 +693,16 @@ function dialogclose(x) {
 
 function center() {
     QS('dialog').left = ((((getDocWidth() - 400) / 2)) + 'px');
-    var sh = 0, mh = (Q('id_mainarea').offsetHeight - ((fullscreen == false)?126:0));
-    QS('id_mainarea_pad').height = (Q('id_mainarea').offsetHeight - sh - ((fullscreen == false)?16:0)) + 'px';
+    // Calculate height taken by warning banners above id_mainarea_pad
+    var warningH = 0;
+    var tlsW = Q('id_tlsWarning'), verW = Q('id_versionWarning');
+    if (tlsW && tlsW.style.display !== 'none') warningH += tlsW.offsetHeight;
+    if (verW && verW.style.display !== 'none') warningH += verW.offsetHeight;
+    var sh = 0, mh = (Q('id_mainarea').offsetHeight - warningH - ((fullscreen == false)?126:0));
+    QS('id_mainarea_pad').height = (Q('id_mainarea').offsetHeight - sh - warningH - ((fullscreen == false)?16:0)) + 'px';
     if (fullscreen) {
         // Fill the entire screen while maintaining aspect ratio
-        var aw = window.innerWidth, ah = window.innerHeight;
+        var aw = window.innerWidth, ah = window.innerHeight - warningH;
         var desk = Q('Desk'), cw = desk.width, ch = desk.height;
         var scale = Math.min(aw / cw, ah / ch);
         var sw = Math.round(cw * scale), sh2 = Math.round(ch * scale);
