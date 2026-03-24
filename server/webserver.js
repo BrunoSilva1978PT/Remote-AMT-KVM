@@ -226,6 +226,49 @@ module.exports.CreateWebServer = function (args) {
         }
     });
 
+    // Download netboot.xyz ISO to temp directory and return path for IDER mounting
+    obj.app.post('/netboot-download.ashx', function (req, res) {
+        res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0', 'Content-Type': 'application/json' });
+        var url = req.body.url;
+        if (!url || url.indexOf('netboot.xyz') === -1) { res.status(400).send(JSON.stringify({ error: 'Invalid URL' })); return; }
+
+        var tmpDir = require('os').tmpdir();
+        var filePath = require('path').join(tmpDir, 'netboot.xyz.iso');
+
+        // Use cached file if it exists and is less than 24 hours old
+        try {
+            var stat = require('fs').statSync(filePath);
+            if (stat.size > 0 && (Date.now() - stat.mtimeMs) < 86400000) {
+                res.send(JSON.stringify({ path: filePath, cached: true }));
+                return;
+            }
+        } catch (e) { /* file doesn't exist, proceed with download */ }
+
+        var https = require('https');
+        var file = require('fs').createWriteStream(filePath);
+        var request = function (downloadUrl, redirectCount) {
+            if (redirectCount > 5) { res.status(500).send(JSON.stringify({ error: 'Too many redirects' })); return; }
+            https.get(downloadUrl, function (response) {
+                if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                    response.resume();
+                    request(response.headers.location, redirectCount + 1);
+                    return;
+                }
+                if (response.statusCode !== 200) {
+                    response.resume();
+                    res.status(500).send(JSON.stringify({ error: 'Download failed: HTTP ' + response.statusCode }));
+                    return;
+                }
+                response.pipe(file);
+                file.on('finish', function () { file.close(); res.send(JSON.stringify({ path: filePath, size: file.bytesWritten })); });
+            }).on('error', function (err) {
+                require('fs').unlink(filePath, function () {});
+                res.status(500).send(JSON.stringify({ error: err.message }));
+            });
+        };
+        request(url, 0);
+    });
+
     // RMCP Presence Ping - batch ping multiple AMT hosts via UDP 623
     obj.app.get('/rmcp-ping.ashx', function (req, res) {
         res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0', 'Content-Type': 'application/json' });

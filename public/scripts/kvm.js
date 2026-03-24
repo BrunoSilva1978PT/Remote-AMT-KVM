@@ -560,6 +560,35 @@ function ejectIder() {
     }
 }
 
+function mountNetbootXyz() {
+    var btn = Q('iderNetbootBtn');
+    btn.disabled = true;
+    btn.value = '\u23F3 Downloading...';
+    Q('iderStatus').textContent = 'Downloading netboot.xyz ISO...';
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/netboot-download.ashx', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+            btn.disabled = false;
+            btn.value = '\u26A1 netboot.xyz';
+            if (xhr.status === 200) {
+                try {
+                    var r = JSON.parse(xhr.responseText);
+                    if (r.path) {
+                        iderMountMode = 'cdrom';
+                        startServerSideIder(r.path, 'netboot.xyz.iso');
+                    }
+                } catch (e) { Q('iderStatus').textContent = 'Error parsing response'; }
+            } else {
+                Q('iderStatus').textContent = 'Download failed: ' + (xhr.statusText || 'unknown error');
+            }
+        }
+    };
+    xhr.send(JSON.stringify({ url: 'https://boot.netboot.xyz/ipxe/netboot.xyz.iso' }));
+}
+
 function onIderStateChange(obj, state) {
     if (!iderServerSide) updateIderUI();
     if (state == 0 && ider.m) {
