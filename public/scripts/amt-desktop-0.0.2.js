@@ -49,6 +49,24 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
     obj.lowcolor = false;
     // ###END###{DesktopInband}
 
+    // Pre-computed color lookup tables: convert color value → RGBA32 once, use everywhere.
+    // Eliminates per-pixel bit manipulation. Uint32Array pixel format: 0xAABBGGRR (little-endian).
+    var _lut8 = new Uint32Array(256);       // RGB332 (8-bit color)
+    var _lutGray = new Uint32Array(256);     // Grayscale
+    var _lutGrayLow = new Uint32Array(256);  // Grayscale low-color (4-bit shifted)
+    for (var _i = 0; _i < 256; _i++) {
+        var _r = _i & 224, _g = (_i & 28) << 3, _b = (_i & 3) << 6; if (_b > 127) _b += 32;
+        _lut8[_i] = 0xFF000000 | (_b << 16) | (_g << 8) | _r;
+        _lutGray[_i] = 0xFF000000 | (_i << 16) | (_i << 8) | _i;
+        var _lv = (_i << 4) & 0xFF;
+        _lutGrayLow[_i] = 0xFF000000 | (_lv << 16) | (_lv << 8) | _lv;
+    }
+    var _lut16 = new Uint32Array(65536);     // RGB565 (16-bit color)
+    for (var _i = 0; _i < 65536; _i++) {
+        var _r = (_i >> 8) & 248, _g = (_i >> 3) & 252, _b = (_i & 31) << 3;
+        _lut16[_i] = 0xFF000000 | (_b << 16) | (_g << 8) | _r;
+    }
+
     obj.mNagleTimer = null; // Mouse motion slowdown timer
     obj.mx = 0; // Last mouse x position
     obj.my = 0; // Last mouse y position
@@ -287,23 +305,15 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
                     if (avail < cs) return; // Check we have all the data needed and we can only draw 64x64 tiles.
                     cmdsize = cs;
 
-                    // CRITICAL LOOP - inlined pixel operations, no per-pixel function calls
-                    var sd = obj.spare.data, absptr = obj.accoff + ptr;
+                    // CRITICAL LOOP - LUT lookup + single 32-bit write per pixel
+                    var u32 = new Uint32Array(obj.spare.data.buffer), absptr = obj.accoff + ptr;
                     if (obj.bpp == 2) {
-                        for (var i = 0, pp = 0; i < s; i++, pp += 4, absptr += 2) {
-                            var v = obj.acc[absptr] | (obj.acc[absptr + 1] << 8);
-                            sd[pp] = (v >> 8) & 248; sd[pp + 1] = (v >> 3) & 252; sd[pp + 2] = (v & 31) << 3;
-                        }
-                    } else if (obj.graymode) {
-                        for (var i = 0, pp = 0; i < s; i++, pp += 4) {
-                            var v = obj.acc[absptr++]; if (obj.lowcolor) { v = v << 4; }
-                            sd[pp] = sd[pp + 1] = sd[pp + 2] = v;
+                        for (var i = 0; i < s; i++, absptr += 2) {
+                            u32[i] = _lut16[obj.acc[absptr] | (obj.acc[absptr + 1] << 8)];
                         }
                     } else {
-                        for (var i = 0, pp = 0; i < s; i++, pp += 4) {
-                            var v = obj.acc[absptr++];
-                            sd[pp] = v & 224; sd[pp + 1] = (v & 28) << 3; sd[pp + 2] = _fixColor((v & 3) << 6);
-                        }
+                        var lut = obj.graymode ? (obj.lowcolor ? _lutGrayLow : _lutGray) : _lut8;
+                        for (var i = 0; i < s; i++) { u32[i] = lut[obj.acc[absptr++]]; }
                     }
                     _putImage(obj.spare, x, y);
                 } else if (encoding == 16) {
@@ -357,109 +367,81 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
     }
 
     function _decodeLRE(data, ptr, x, y, width, height, s, datalen) {
-        var subencoding = data[ptr++], index, v, runlengthdecode, palette = {}, rlecount = 0, runlength = 0, i;
+        var subencoding = data[ptr++], index, v, runlengthdecode, rlecount = 0, runlength = 0, i;
+        var u32 = new Uint32Array(obj.spare.data.buffer);
         if (subencoding == 0) {
-            // RAW encoding
-            var sd = obj.spare.data;
+            // RAW encoding - LUT lookup, single 32-bit write per pixel
             if (obj.bpp == 2) {
-                for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++] + (data[ptr++] << 8); sd[pp] = (v >> 8) & 248; sd[pp + 1] = (v >> 3) & 252; sd[pp + 2] = (v & 31) << 3; }
-            } else if (obj.graymode) {
-                for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++]; if (obj.lowcolor) { v = v << 4; } sd[pp] = sd[pp + 1] = sd[pp + 2] = v; }
+                for (i = 0; i < s; i++) { u32[i] = _lut16[data[ptr++] + (data[ptr++] << 8)]; }
             } else {
-                for (i = 0, pp = 0; i < s; i++, pp += 4) { v = data[ptr++]; sd[pp] = v & 224; sd[pp + 1] = (v & 28) << 3; sd[pp + 2] = _fixColor((v & 3) << 6); }
+                var lut = obj.graymode ? (obj.lowcolor ? _lutGrayLow : _lutGray) : _lut8;
+                for (i = 0; i < s; i++) { u32[i] = lut[data[ptr++]]; }
             }
             _putImage(obj.spare, x, y);
         }
         else if (subencoding == 1) {
-            // Solid color tile
+            // Solid color tile - fillRect is GPU-accelerated, fastest for solid fills
             if (obj.graymode) {
-                v = data[ptr++];
-                if (obj.lowcolor) { v = v << 4; }
+                v = data[ptr++]; if (obj.lowcolor) { v = v << 4; }
                 obj.canvas.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
             } else {
                 v = data[ptr++] + ((obj.bpp == 2) ? (data[ptr++] << 8) : 0);
                 obj.canvas.fillStyle = 'rgb(' + ((obj.bpp == 1) ? ((v & 224) + ',' + ((v & 28) << 3) + ',' + _fixColor((v & 3) << 6)) : (((v >> 8) & 248) + ',' + ((v >> 3) & 252) + ',' + ((v & 31) << 3))) + ')';
             }
-
             obj.canvas.fillRect(x, y, width, height);
         }
         else if (subencoding > 1 && subencoding < 17) { // Packed palette encoded tile
-            // Read the palette
-            var br = 4, bm = 15, sd = obj.spare.data;
+            // Read palette as pre-converted RGBA32 values (no per-pixel conversion needed)
+            var br = 4, bm = 15;
+            var pal32 = new Uint32Array(subencoding);
             if (obj.bpp == 2) {
-                for (i = 0; i < subencoding; i++) { palette[i] = data[ptr++] + (data[ptr++] << 8); }
-                if (subencoding == 2) { br = 1; bm = 1; } else if (subencoding <= 4) { br = 2; bm = 3; }
-                while (rlecount < s && ptr < data.byteLength) {
-                    v = data[ptr++];
-                    for (i = (8 - br); i >= 0 && rlecount < s; i -= br) {
-                        var cv = palette[(v >> i) & bm], pp = rlecount << 2;
-                        sd[pp] = (cv >> 8) & 248; sd[pp + 1] = (cv >> 3) & 252; sd[pp + 2] = (cv & 31) << 3;
-                        rlecount++;
-                    }
-                }
+                for (i = 0; i < subencoding; i++) { pal32[i] = _lut16[data[ptr++] + (data[ptr++] << 8)]; }
             } else {
-                for (i = 0; i < subencoding; i++) { palette[i] = data[ptr++]; }
-                if (subencoding == 2) { br = 1; bm = 1; } else if (subencoding <= 4) { br = 2; bm = 3; }
-                while (rlecount < s && ptr < data.byteLength) {
-                    v = data[ptr++];
-                    for (i = (8 - br); i >= 0 && rlecount < s; i -= br) {
-                        var cv = palette[(v >> i) & bm], pp = rlecount << 2;
-                        if (obj.graymode) { if (obj.lowcolor) { cv = cv << 4; } sd[pp] = sd[pp + 1] = sd[pp + 2] = cv; }
-                        else { sd[pp] = cv & 224; sd[pp + 1] = (cv & 28) << 3; sd[pp + 2] = _fixColor((cv & 3) << 6); }
-                        rlecount++;
-                    }
+                var lut = obj.graymode ? (obj.lowcolor ? _lutGrayLow : _lutGray) : _lut8;
+                for (i = 0; i < subencoding; i++) { pal32[i] = lut[data[ptr++]]; }
+            }
+            if (subencoding == 2) { br = 1; bm = 1; } else if (subencoding <= 4) { br = 2; bm = 3; }
+            while (rlecount < s && ptr < data.byteLength) {
+                v = data[ptr++];
+                for (i = (8 - br); i >= 0 && rlecount < s; i -= br) {
+                    u32[rlecount++] = pal32[(v >> i) & bm];
                 }
             }
             _putImage(obj.spare, x, y);
         }
         else if (subencoding == 128) { // RLE encoded tile
+            // LUT lookup + native fill() for runs (uses memset/SIMD internally)
             if (obj.bpp == 2) {
                 while (rlecount < s && ptr < data.byteLength) {
-                    // Get the run color
-                    v = data[ptr++] + (data[ptr++] << 8);
-
-                    // Decode the run length. This is the fastest and most compact way I found to do this.
+                    v = _lut16[data[ptr++] + (data[ptr++] << 8)];
                     runlength = 1; do { runlength += (runlengthdecode = data[ptr++]); } while (runlengthdecode == 255);
-
-                    // Draw a run
-                    _setPixel16run(v, rlecount, runlength); rlecount += runlength;
+                    u32.fill(v, rlecount, rlecount + runlength); rlecount += runlength;
                 }
             } else {
+                var lut = obj.graymode ? (obj.lowcolor ? _lutGrayLow : _lutGray) : _lut8;
                 while (rlecount < s && ptr < data.byteLength) {
-                    // Get the run color
-                    v = data[ptr++];
-
-                    // Decode the run length. This is the fastest and most compact way I found to do this.
+                    v = lut[data[ptr++]];
                     runlength = 1; do { runlength += (runlengthdecode = data[ptr++]); } while (runlengthdecode == 255);
-
-                    // Draw a run
-                    _setPixel8run(v, rlecount, runlength); rlecount += runlength;
+                    u32.fill(v, rlecount, rlecount + runlength); rlecount += runlength;
                 }
             }
             _putImage(obj.spare, x, y);
         }
         else if (subencoding > 129) { // Palette RLE encoded tile
-            // Read the palette
+            // Read palette as pre-converted RGBA32 values
+            var palSize = subencoding - 128;
+            var pal32 = new Uint32Array(palSize);
             if (obj.bpp == 2) {
-                for (i = 0; i < (subencoding - 128); i++) { palette[i] = data[ptr++] + (data[ptr++] << 8); }
+                for (i = 0; i < palSize; i++) { pal32[i] = _lut16[data[ptr++] + (data[ptr++] << 8)]; }
             } else {
-                for (i = 0; i < (subencoding - 128); i++) { palette[i] = data[ptr++]; }
+                var lut = obj.graymode ? (obj.lowcolor ? _lutGrayLow : _lutGray) : _lut8;
+                for (i = 0; i < palSize; i++) { pal32[i] = lut[data[ptr++]]; }
             }
-
-            // Decode RLE  on palette
+            // Decode RLE on palette - native fill() for runs
             while (rlecount < s && ptr < data.byteLength) {
-                // Setup the run, get the color index and get the color from the palette.
-                runlength = 1; index = data[ptr++]; v = palette[index % 128];
-
-                // If the index starts with high order bit 1, this is a run and decode the run length.
+                runlength = 1; index = data[ptr++]; v = pal32[index & 127];
                 if (index > 127) { do { runlength += (runlengthdecode = data[ptr++]); } while (runlengthdecode == 255); }
-
-                // Draw a run
-                if (obj.bpp == 2) {
-                    _setPixel16run(v, rlecount, runlength); rlecount += runlength;
-                } else {
-                    _setPixel8run(v, rlecount, runlength); rlecount += runlength;
-                }
+                u32.fill(v, rlecount, rlecount + runlength); rlecount += runlength;
             }
             _putImage(obj.spare, x, y);
         }
@@ -493,22 +475,15 @@ var CreateAmtRemoteDesktop = function (divid, scrolldiv) {
         obj.canvas.putImageData(i, x, y);
     }
 
-    // Set a run of 8bit color RGB332
+    // Set a run of 8bit color RGB332 - LUT lookup + native fill (memset/SIMD)
     function _setPixel8run(v, p, run) {
-        if (obj.graymode) {
-            var pp = (p << 2);
-            if (obj.lowcolor) { v = v << 4; }
-            while (--run >= 0) { obj.spare.data[pp] = obj.spare.data[pp + 1] = obj.spare.data[pp + 2] = v; pp += 4; }
-        } else {
-            var pp = (p << 2), r = (v & 224), g = ((v & 28) << 3), b = (_fixColor((v & 3) << 6));
-            while (--run >= 0) { obj.spare.data[pp] = r; obj.spare.data[pp + 1] = g; obj.spare.data[pp + 2] = b; pp += 4; }
-        }
+        var lut = obj.graymode ? (obj.lowcolor ? _lutGrayLow : _lutGray) : _lut8;
+        new Uint32Array(obj.spare.data.buffer).fill(lut[v], p, p + run);
     }
 
-    // Set a run of 16bit color RGB565
+    // Set a run of 16bit color RGB565 - LUT lookup + native fill
     function _setPixel16run(v, p, run) {
-        var pp = (p << 2), r = ((v >> 8) & 248), g = ((v >> 3) & 252), b = ((v & 31) << 3);
-        while (--run >= 0) { obj.spare.data[pp] = r; obj.spare.data[pp + 1] = g; obj.spare.data[pp + 2] = b; pp += 4; }
+        new Uint32Array(obj.spare.data.buffer).fill(_lut16[v], p, p + run);
     }
 
     function _fixColor(c) { return (c > 127) ? (c + 32) : c; }
