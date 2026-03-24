@@ -695,16 +695,27 @@ function center() {
     QS('dialog').left = ((((getDocWidth() - 400) / 2)) + 'px');
     var sh = 0, mh = (Q('id_mainarea').offsetHeight - ((fullscreen == false)?126:0));
     QS('id_mainarea_pad').height = (Q('id_mainarea').offsetHeight - sh - ((fullscreen == false)?16:0)) + 'px';
-    QS('Desk')['max-height'] = (mh - sh) + 'px';
-    QS('Desk')['max-width'] = (Q('id_mainarea').offsetWidth - ((fullscreen == false)?32:0)) + 'px';
-    if (Q('id_DeskParent').offsetWidth != 0) QS('Desk')['max-width'] = Q('id_DeskParent').offsetWidth;
     if (fullscreen) {
+        // Fill the entire screen while maintaining aspect ratio
+        var aw = window.innerWidth, ah = window.innerHeight;
+        var desk = Q('Desk'), cw = desk.width, ch = desk.height;
+        var scale = Math.min(aw / cw, ah / ch);
+        var sw = Math.round(cw * scale), sh2 = Math.round(ch * scale);
+        QS('Desk')['max-height'] = ''; QS('Desk')['max-width'] = '';
+        QS('Desk').width = sw + 'px'; QS('Desk').height = sh2 + 'px';
         QS('id_mainarea_pad')['overflow-y'] = 'hidden';
-        var h = (mh - sh - Q('Desk').offsetHeight) / 2;
+        var h = (ah - sh2) / 2;
         QS('Desk')['margin-top'] = h + 'px'; QS('Desk')['margin-bottom'] = h + 'px';
+        var marginLeft = (aw - sw) / 2;
+        QS('Desk')['margin-left'] = marginLeft + 'px'; QS('Desk')['margin-right'] = marginLeft + 'px';
     } else {
+        QS('Desk')['max-height'] = (mh - sh) + 'px';
+        QS('Desk')['max-width'] = (Q('id_mainarea').offsetWidth - 32) + 'px';
+        if (Q('id_DeskParent').offsetWidth != 0) QS('Desk')['max-width'] = Q('id_DeskParent').offsetWidth;
         QS('id_mainarea_pad')['overflow-y'] = 'scroll';
         QS('Desk')['margin-top'] = '0'; QS('Desk')['margin-bottom'] = '0';
+        QS('Desk').width = ''; QS('Desk').height = '';
+        QS('Desk')['margin-left'] = '0px'; QS('Desk')['margin-right'] = '';
     }
 }
 
