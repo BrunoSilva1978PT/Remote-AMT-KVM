@@ -263,20 +263,32 @@ function powerActionTimeout() {
 
 function powerActionBootToSource(bootSourceInstanceID, bootSettings, powerState) {
     var timer = powerActionTimeout();
-    amtstack.SetBootConfigRole(1, function (stack, name, response, status) {
-        if (status !== 200) { clearTimeout(timer); powerActionResult(false, "SetBootConfigRole failed (error " + status + ")."); return; }
-        var sourceXml = bootSourceInstanceID ? '<Address xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2004/08/addressing</Address><ReferenceParameters xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing"><ResourceURI xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_BootSourceSetting</ResourceURI><SelectorSet xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"><Selector Name="InstanceID">' + bootSourceInstanceID + '</Selector></SelectorSet></ReferenceParameters>' : null;
-        amtstack.CIM_BootConfigSetting_ChangeBootOrder(sourceXml, function (stack, name, response, status) {
-            if (status !== 200) { clearTimeout(timer); powerActionResult(false, "ChangeBootOrder failed (error " + status + ")."); return; }
-            amtstack.Put('AMT_BootSettingData', bootSettings || {}, function (stack, name, response, status) {
-                if (status !== 200) { clearTimeout(timer); powerActionResult(false, "Put BootSettingData failed (error " + status + ")."); return; }
-                amtstack.RequestPowerStateChange(powerState, function (stack, name, response, status) {
-                    clearTimeout(timer);
-                    if (status == 200) { powerActionResult(true); } else { powerActionResult(false, "RequestPowerStateChange failed (error " + status + ")."); }
-                });
-            }, 0, 1);
+    // First GET the full AMT_BootSettingData, then merge our changes and PUT back
+    amtstack.Get('AMT_BootSettingData', function (stack, name, response, status) {
+        if (status !== 200) { clearTimeout(timer); powerActionResult(false, "Get BootSettingData failed (error " + status + ")."); return; }
+        var fullSettings = response.Body;
+        // Reset all boot flags, then apply requested settings
+        fullSettings['UseIDER'] = false;
+        fullSettings['UseSOL'] = false;
+        fullSettings['BIOSSetup'] = false;
+        fullSettings['BIOSPause'] = false;
+        fullSettings['BootMediaIndex'] = 0;
+        for (var k in bootSettings) { if (bootSettings.hasOwnProperty(k)) { fullSettings[k] = bootSettings[k]; } }
+        amtstack.SetBootConfigRole(1, function (stack, name, response, status) {
+            if (status !== 200) { clearTimeout(timer); powerActionResult(false, "SetBootConfigRole failed (error " + status + ")."); return; }
+            var sourceXml = bootSourceInstanceID ? '<Address xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing">http://schemas.xmlsoap.org/ws/2004/08/addressing</Address><ReferenceParameters xmlns="http://schemas.xmlsoap.org/ws/2004/08/addressing"><ResourceURI xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd">http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_BootSourceSetting</ResourceURI><SelectorSet xmlns="http://schemas.dmtf.org/wbem/wsman/1/wsman.xsd"><Selector Name="InstanceID">' + bootSourceInstanceID + '</Selector></SelectorSet></ReferenceParameters>' : null;
+            amtstack.CIM_BootConfigSetting_ChangeBootOrder(sourceXml, function (stack, name, response, status) {
+                if (status !== 200) { clearTimeout(timer); powerActionResult(false, "ChangeBootOrder failed (error " + status + ")."); return; }
+                amtstack.Put('AMT_BootSettingData', fullSettings, function (stack, name, response, status) {
+                    if (status !== 200) { clearTimeout(timer); powerActionResult(false, "Put BootSettingData failed (error " + status + ")."); return; }
+                    amtstack.RequestPowerStateChange(powerState, function (stack, name, response, status) {
+                        clearTimeout(timer);
+                        if (status == 200) { powerActionResult(true); } else { powerActionResult(false, "RequestPowerStateChange failed (error " + status + ")."); }
+                    });
+                }, 0, 1);
+            });
         });
-    });
+    }, 0, 1);
 }
 
 function powerActionDlg() {
